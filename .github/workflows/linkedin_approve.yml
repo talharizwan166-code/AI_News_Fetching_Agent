@@ -1,0 +1,208 @@
+name: LinkedIn Post Approval
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  handle-comment:
+    if: contains(github.event.issue.labels.*.name, 'linkedin-pending')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check comment
+        id: check
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOC: ${{ github.event.comment.author_association }}
+        run: |
+          # Only allow repo owner/collaborators
+          if [[ "$AUTHOR_ASSOC" != "OWNER" && "$AUTHOR_ASSOC" != "MEMBER" && "$AUTHOR_ASSOC" != "COLLABORATOR" ]]; then
+            echo "action=unauthorized" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          COMMENT="$(echo "$COMMENT_BODY" | tr '[:upper:]' '[:lower:]' | xargs)"
+          if [ "$COMMENT" = "approve" ]; then
+            echo "action=approve" >> $GITHUB_OUTPUT
+          elif [ "$COMMENT" = "reject" ]; then
+            echo "action=reject" >> $GITHUB_OUTPUT
+          else
+            echo "action=ignore" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check LinkedIn secrets
+        if: steps.check.outputs.action == 'approve'
+        id: secrets
+        env:
+          HAS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN != '' }}
+          HAS_URN: ${{ secrets.LINKEDIN_PERSON_URN != '' }}
+        run: |
+          if [[ "$HAS_TOKEN" == "true" && "$HAS_URN" == "true" ]]; then
+            echo "mode=auto" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_TOKEN" == "true" ]]; then
+            echo "mode=manual" >> $GITHUB_OUTPUT
+          else
+            echo "mode=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment missing token
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'none'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '**LinkedIn access token is not configured.** To enable posting:\n',
+                '1. Go to [LinkedIn Developer Portal](https://developer.linkedin.com/) and create an app',
+                '2. Under **Products**, request **"Share on LinkedIn"**',
+                '3. Get your OAuth access token',
+                '4. Add `LINKEDIN_ACCESS_TOKEN` as a GitHub Secret (Settings → Secrets → Actions)\n',
+                'Then comment `approve` again.'
+              ].join('\n')
+            });
+
+      - name: Manual share (no person URN)
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'manual'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || '';
+            const postMatch = body.match(/<!-- POST_START -->([\s\S]*?)<!-- POST_END -->/);
+            const postText = postMatch ? postMatch[1].trim() : '';
+            const urlMatch = body.match(/<!-- ARTICLE_URL:(.*?) -->/);
+            const articleUrl = urlMatch ? urlMatch[1].trim() : '';
+            const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleUrl)}`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '**Approved!** Auto-posting is not fully set up yet, but here\'s your post ready to share:\n',
+                '---',
+                '**Step 1:** Copy the post text below:\n',
+                '```',
+                postText,
+                '```\n',
+                `**Step 2:** [Click here to open LinkedIn Share](${shareUrl})\n`,
+                '**Step 3:** Paste the text and post!\n',
+                '---',
+                '_To enable one-click auto-posting, add `LINKEDIN_PERSON_URN` as a GitHub Secret._'
+              ].join('\n')
+            });
+
+      - name: Checkout repository
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
+        run: pip install -r requirements.txt
+
+      - name: Post to LinkedIn
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python -c "
+          import os, re, sys
+          sys.path.insert(0, '.')
+          from src.linkedin_poster import post_to_linkedin
+
+          body = os.environ['ISSUE_BODY']
+
+          post_match = re.search(r'<!-- POST_START -->(.*?)<!-- POST_END -->', body, re.DOTALL)
+          if not post_match:
+              print('ERROR: Could not find post text in issue body')
+              sys.exit(1)
+
+          post_text = post_match.group(1).strip()
+
+          url_match = re.search(r'<!-- ARTICLE_URL:(.*?) -->', body)
+          article_url = url_match.group(1).strip() if url_match else ''
+
+          title_match = re.search(r'<!-- ARTICLE_TITLE:(.*?) -->', body)
+          article_title = title_match.group(1).strip() if title_match else ''
+
+          print(f'Posting to LinkedIn ({len(post_text)} chars)...')
+          print(f'Article: {article_title}')
+          print(f'URL: {article_url}')
+          post_to_linkedin(post_text, article_url=article_url, article_title=article_title)
+          print('Posted successfully!')
+          "
+
+      - name: Comment and close (approved)
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'Posted to LinkedIn successfully!'
+            });
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: 'linkedin-pending'
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['posted-to-linkedin']
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      - name: Comment and close (rejected)
+        if: steps.check.outputs.action == 'reject'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'Post rejected. Issue closed.'
+            });
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: 'linkedin-pending'
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['rejected']
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });

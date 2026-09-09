@@ -1,0 +1,56 @@
+name: AI News Agent
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # Primary: 10:00 AM PKT (5:00 AM UTC)
+    - cron: "30 5 * * *"  # Backup: 10:30 AM PKT in case first run is skipped
+  workflow_dispatch:       # Allow manual trigger
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore database from previous run
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: news-agent-db
+          workflow: news_agent.yml
+          search_artifacts: true
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      - name: Run AI News Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python main.py
+
+      - name: Upload database artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-agent-db
+          path: news_agent.db
+          retention-days: 90
+          overwrite: true
