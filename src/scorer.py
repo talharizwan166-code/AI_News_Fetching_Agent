@@ -26,12 +26,41 @@ INNOVATION_KEYWORDS = [
     "release", "introduce", "discover", "invent",
 ]
 
+# Compile word-boundary regex patterns for each keyword list
+# Use \b for word boundaries, escape special chars
+_AI_PATTERNS = [re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE) for kw in AI_KEYWORDS]
+_DEV_PATTERNS = [re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE) for kw in DEV_KEYWORDS]
+_INNOV_PATTERNS = [re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE) for kw in INNOVATION_KEYWORDS]
 
-def _keyword_score(text: str, keywords: list[str]) -> float:
-    text_lower = text.lower()
-    hits = sum(1 for kw in keywords if kw in text_lower)
-    max_possible = min(len(keywords), 8)
+# Exported for AI relevance filtering
+AI_RELEVANCE_PATTERNS = _AI_PATTERNS
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags and normalize whitespace."""
+    if not text:
+        return ""
+    text = _HTML_TAG_RE.sub(" ", text)
+    text = _WHITESPACE_RE.sub(" ", text)
+    return text.strip()
+
+
+def _keyword_score(text: str, patterns: list[re.Pattern]) -> float:
+    """Score based on word-boundary regex matches."""
+    if not text:
+        return 0.0
+    hits = sum(1 for pat in patterns if pat.search(text))
+    max_possible = min(len(patterns), 8)
     return min(hits / max_possible, 1.0)
+
+
+def ai_relevance_score(text: str) -> float:
+    """Public function to compute AI relevance score for filtering."""
+    clean_text = _strip_html(text)
+    return _keyword_score(clean_text, AI_RELEVANCE_PATTERNS)
 
 
 def _freshness_score(published_at: str) -> float:
@@ -55,11 +84,13 @@ def _freshness_score(published_at: str) -> float:
 
 
 def score_article(article: Article) -> float:
-    text = f"{article.title} {article.summary}"
+    # Strip HTML from summary before scoring
+    clean_summary = _strip_html(article.summary)
+    text = f"{article.title} {clean_summary}"
 
-    ai_score = _keyword_score(text, AI_KEYWORDS)
-    dev_score = _keyword_score(text, DEV_KEYWORDS)
-    innov_score = _keyword_score(text, INNOVATION_KEYWORDS)
+    ai_score = _keyword_score(text, _AI_PATTERNS)
+    dev_score = _keyword_score(text, _DEV_PATTERNS)
+    innov_score = _keyword_score(text, _INNOV_PATTERNS)
     fresh_score = _freshness_score(article.published_at)
     cred_score = SOURCE_CREDIBILITY.get(article.source, 0.5)
 

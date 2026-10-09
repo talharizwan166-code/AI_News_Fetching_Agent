@@ -13,7 +13,7 @@ RSS_FEEDS = {
     "OpenAI Blog": "https://openai.com/blog/rss.xml",
 }
 
-FETCH_TIMEOUT_SECONDS = 15
+FETCH_TIMEOUT_SECONDS = int(os.getenv("FETCH_TIMEOUT_SECONDS", "15"))
 
 SCORING_WEIGHTS = {
     "ai_relevance": 0.30,
@@ -33,15 +33,16 @@ SOURCE_CREDIBILITY = {
     "OpenAI Blog": 0.90,
 }
 
-MIN_QUALITY_THRESHOLD = 0.25
+MIN_QUALITY_THRESHOLD = float(os.getenv("MIN_QUALITY_THRESHOLD", "0.25"))
+MIN_AI_RELEVANCE = float(os.getenv("MIN_AI_RELEVANCE", "0.30"))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-3.6-flash"
-GEMINI_FALLBACK_MODEL = "gemini-3.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
 
-GEMINI_MAX_RETRIES = 3
-GEMINI_RETRY_WAIT_MIN = 2
-GEMINI_RETRY_WAIT_MAX = 30
+GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
+GEMINI_RETRY_WAIT_MIN = int(os.getenv("GEMINI_RETRY_WAIT_MIN", "2"))
+GEMINI_RETRY_WAIT_MAX = int(os.getenv("GEMINI_RETRY_WAIT_MAX", "30"))
 
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
@@ -53,3 +54,40 @@ LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
 LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN", "")
 
 DB_PATH = os.getenv("DB_PATH", "news_agent.db")
+
+
+class Config:
+    """Configuration validator."""
+
+    REQUIRED_VARS = {
+        "GEMINI_API_KEY": GEMINI_API_KEY,
+        "EMAIL_SENDER": EMAIL_SENDER,
+        "EMAIL_PASSWORD": EMAIL_PASSWORD,
+        "EMAIL_RECIPIENT": EMAIL_RECIPIENT,
+    }
+
+    @classmethod
+    def validate(cls) -> tuple[bool, list[str]]:
+        """Validate all required config. Returns (is_valid, missing_vars)."""
+        missing = [name for name, value in cls.REQUIRED_VARS.items() if not value]
+        return (len(missing) == 0, missing)
+
+    @classmethod
+    def validate_scoring_weights(cls) -> tuple[bool, str]:
+        """Validate scoring weights sum to 1.0."""
+        total = sum(SCORING_WEIGHTS.values())
+        if abs(total - 1.0) > 0.001:
+            return False, f"Scoring weights sum to {total:.3f}, expected 1.0"
+        return True, ""
+
+    @classmethod
+    def validate_thresholds(cls) -> tuple[bool, str]:
+        """Validate thresholds are in valid range."""
+        if not 0 <= MIN_QUALITY_THRESHOLD <= 1:
+            return False, f"MIN_QUALITY_THRESHOLD must be 0-1, got {MIN_QUALITY_THRESHOLD}"
+        if not 0 <= MIN_AI_RELEVANCE <= 1:
+            return False, f"MIN_AI_RELEVANCE must be 0-1, got {MIN_AI_RELEVANCE}"
+        return True, ""
+
+
+config = Config()

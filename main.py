@@ -1,263 +1,119 @@
+#!/usr/bin/env python3
 """
-Main Application Entry Point
+AI News Agent - Main Entry Point
 
-This is the heart of the application. When you run this file, it:
-1. Fetches latest AI news from RSS feeds
-2. Filters out duplicates
-3. Scores and ranks articles
-4. Selects the best one
-5. Generates a LinkedIn post
-6. Emails it to you
-
-How to run:
-    python main.py
-
-What happens:
-    - Loads configuration from .env
-    - Validates all settings
-    - Runs the complete pipeline
-    - Logs everything for debugging
+Thin wrapper that:
+- Configures logging from LOG_LEVEL env var
+- Validates configuration
+- Calls src.agent.run_agent() with optional dry-run
+- Exits with non-zero code on failure
 """
 
 import sys
+import os
+import logging
 from datetime import datetime
-from config import config
-from utils import get_logger
-from services import NewsFetcher, EmailService
-from agents import NewsScorer, PostGenerator
-from database import NewsDatabase
 
-logger = get_logger(__name__)
+# Load .env before importing config
+from dotenv import load_dotenv
+load_dotenv()
+
+from src.config import config
+from src.agent import run_agent
 
 
-def validate_configuration() -> bool:
-    """
-    Validate that all required configuration is present.
+def setup_logging() -> None:
+    """Configure logging from LOG_LEVEL environment variable."""
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    numeric_level = getattr(logging, log_level, logging.INFO)
 
-    Returns:
-        True if valid, False otherwise (exits on False)
-    """
-    logger.info("Validating configuration...")
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # Quiet noisy third-party loggers unless DEBUG
+    if numeric_level > logging.DEBUG:
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("google").setLevel(logging.WARNING)
+        logging.getLogger("feedparser").setLevel(logging.WARNING)
+
+
+def validate_config() -> bool:
+    """Validate all required configuration is present."""
     is_valid, missing = config.validate()
-
     if not is_valid:
-        logger.error("Configuration validation failed!")
-        logger.error(f"Missing required environment variables: {', '.join(missing)}")
-        logger.error("Please check your .env file. See .env.example for reference.")
+        logging.error("Configuration validation failed!")
+        logging.error("Missing required environment variables: %s", ", ".join(missing))
+        logging.error("Check your .env file. See .env.example for reference.")
         return False
-
-    logger.info("Configuration validated successfully")
+    logging.info("Configuration validated successfully")
     return True
 
 
-def fetch_news() -> list:
-    """
-    Fetch news from all sources.
+def parse_args() -> dict:
+    """Parse command-line arguments."""
+    import argparse
 
-    Returns:
-        List of NewsArticle objects
-    """
-    logger.info("=" * 60)
-    logger.info("STEP 1: Fetching AI News")
-    logger.info("=" * 60)
-
-    fetcher = NewsFetcher()
-    articles = fetcher.fetch_all()
-
-    logger.info(f"Fetched {len(articles)} articles from all sources")
-    return articles
-
-
-def filter_duplicates(articles: list, db: NewsDatabase) -> list:
-    """
-    Remove articles that were already posted.
-
-    Args:
-        articles: List of NewsArticle objects
-        db: Database instance
-
-    Returns:
-        Filtered list of NewsArticle objects
-    """
-    logger.info("=" * 60)
-    logger.info("STEP 2: Filtering Duplicates")
-    logger.info("=" * 60)
-
-    unique_articles = []
-
-    for article in articles:
-        if db.is_duplicate(article):
-            logger.debug(f"Skipping duplicate: {article.title}")
-        else:
-            unique_articles.append(article)
-
-    logger.info(f"After filtering: {len(unique_articles)} unique articles")
-    return unique_articles
+    parser = argparse.ArgumentParser(description="AI News Agent")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run fetch->dedup->score->select->generate, print result, no email/issue/DB write",
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable debug logging (overrides LOG_LEVEL)",
+    )
+    return vars(parser.parse_args())
 
 
-def score_and_rank(articles: list) -> list:
-    """
-    Score articles and sort by relevance.
+def main() -> int:
+    """Main entry point. Returns exit code (0=success, 1=failure)."""
+    args = parse_args()
 
-    Args:
-        articles: List of NewsArticle objects
+    if args["verbose"]:
+        os.environ["LOG_LEVEL"] = "DEBUG"
 
-    Returns:
-        Sorted list (highest score first)
-    """
-    logger.info("=" * 60)
-    logger.info("STEP 3: Scoring & Ranking Articles")
-    logger.info("=" * 60)
+    setup_logging()
 
-    scorer = NewsScorer()
-    ranked_articles = scorer.rank_articles(articles)
+    logger = logging.getLogger(__name__)
 
-    # Log top 5
-    logger.info("Top 5 articles:")
-    for i, article in enumerate(ranked_articles[:5], 1):
-        logger.info(f"  {i}. [{article.score:.1f}] {article.title}")
-        logger.info(f"     Source: {article.source}")
-
-    return ranked_articles
-
-
-def generate_linkedin_post(article):
-    """
-    Generate LinkedIn post using Gemini API.
-
-    Args:
-        article: NewsArticle to create post from
-
-    Returns:
-        LinkedInPost object or None if generation fails
-    """
-    logger.info("=" * 60)
-    logger.info("STEP 4: Generating LinkedIn Post")
-    logger.info("=" * 60)
-
-    logger.info(f"Generating post for: {article.title}")
-
-    try:
-        generator = PostGenerator()
-        post = generator.generate_post(article)
-
-        if post:
-            logger.info("Successfully generated LinkedIn post")
-            logger.info(f"Preview: {post.hook[:100]}...")
-
-        return post
-    except Exception as e:
-        logger.error(f"Failed to generate post: {str(e)}", exc_info=True)
-        return None
-
-
-def send_email(post):
-    """
-    Send the LinkedIn post draft via email.
-
-    Args:
-        post: LinkedInPost object to send
-
-    Returns:
-        True if sent successfully, False otherwise
-    """
-    logger.info("=" * 60)
-    logger.info("STEP 5: Sending Email")
-    logger.info("=" * 60)
-
-    try:
-        email_service = EmailService()
-        success = email_service.send_post(post)
-
-        if success:
-            logger.info("Email sent successfully")
-        else:
-            logger.error("Failed to send email")
-
-        return success
-    except Exception as e:
-        logger.error(f"Error sending email: {str(e)}", exc_info=True)
-        return False
-
-
-def main():
-    """
-    Main application logic.
-    """
     logger.info("=" * 60)
     logger.info("AI NEWS CONTENT AGENT - STARTED")
-    logger.info(f"Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("Run time: %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    if args["dry_run"]:
+        logger.info("MODE: DRY RUN (no email, no issue, no DB write)")
     logger.info("=" * 60)
 
     try:
-        # Step 0: Validate configuration
-        if not validate_configuration():
-            sys.exit(1)
+        # Validate configuration
+        if not validate_config():
+            return 1
 
-        # Initialize database
-        db = NewsDatabase()
+        # Run the agent
+        result = run_agent(dry_run=args["dry_run"])
 
-        # Step 1: Fetch news
-        articles = fetch_news()
-
-        if not articles:
-            logger.warning("No articles fetched. Exiting.")
-            return
-
-        # Step 2: Filter duplicates
-        unique_articles = filter_duplicates(articles, db)
-
-        if not unique_articles:
-            logger.warning("No unique articles found. All were duplicates.")
-            return
-
-        # Step 3: Score and rank
-        ranked_articles = score_and_rank(unique_articles)
-
-        # Step 3.5: Apply diversity-aware selection
-        logger.info("=" * 60)
-        logger.info("STEP 3.5: Diversity-Aware Selection")
-        logger.info("=" * 60)
-
-        scorer = NewsScorer()
-        diverse_candidates = scorer.select_diverse_candidates(ranked_articles)
-
-        logger.info(f"Diverse candidates: {len(diverse_candidates)} articles")
-        if len(diverse_candidates) > 1:
-            logger.info("Top 3 diverse candidates:")
-            for i, article in enumerate(diverse_candidates[:3], 1):
-                logger.info(f"  {i}. [{article.score:.1f}] {article.source}: {article.title}")
-
-        # Select best article from diverse candidates
-        best_article = diverse_candidates[0]
-        logger.info(f"Selected article: {best_article.title}")
-        logger.info(f"Score: {best_article.score}")
-        logger.info(f"Source: {best_article.source}")
-        logger.info(f"URL: {best_article.url}")
-
-        # Step 4: Generate LinkedIn post
-        post = generate_linkedin_post(best_article)
-
-        if not post:
-            logger.error("Failed to generate LinkedIn post")
-            return
-
-        # Step 5: Send email
-        success = send_email(post)
-
-        if success:
-            # Save to database to prevent duplicates
-            db.save_posted_article(best_article)
-            logger.info("Successfully completed all steps!")
+        # Determine exit code based on result
+        status = result.get("status", "error")
+        if status == "success":
+            logger.info("=== AI News Agent finished successfully ===")
+            return 0
+        elif status in ("no_articles", "all_published", "below_threshold", "gemini_failed"):
+            logger.warning("Agent completed with status: %s", status)
+            return 0  # Not a failure - just no actionable result
         else:
-            logger.error("Failed to send email")
+            logger.error("Agent failed with status: %s", status)
+            return 1
 
     except KeyboardInterrupt:
         logger.info("Application interrupted by user")
-        sys.exit(0)
+        return 0
     except Exception as e:
-        logger.error(f"Application error: {str(e)}", exc_info=True)
-        sys.exit(1)
+        logger.exception("Application error: %s", e)
+        return 1
     finally:
         logger.info("=" * 60)
         logger.info("AI NEWS CONTENT AGENT - FINISHED")
@@ -265,4 +121,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

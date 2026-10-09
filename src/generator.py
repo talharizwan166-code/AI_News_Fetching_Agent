@@ -1,8 +1,9 @@
 import logging
+import re
 
 from google import genai
 from google.genai.errors import ServerError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 from src.fetcher import Article
 from src.config import (
@@ -38,21 +39,64 @@ Requirements:
 
 Write the LinkedIn post now:"""
 
+# Retryable error codes
+_RETRYABLE_CODES = {429, 500, 502, 503, 504}
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """Check if exception is retryable (429, 5xx, ServerError)."""
+    if isinstance(exc, ServerError):
+        return True
+    # Check for HTTP status codes in error message
+    err_str = str(exc)
+    for code in _RETRYABLE_CODES:
+        if str(code) in err_str:
+            return True
+    return False
+
+
+def _validate_post(post: str, article_url: str) -> tuple[bool, str]:
+    """
+    Validate generated LinkedIn post.
+    Returns (is_valid, error_message).
+    """
+    if not post or not post.strip():
+        return False, "Empty post"
+
+    # Word count check (≤280 words)
+    word_count = len(post.split())
+    if word_count > 280:
+        return False, f"Post exceeds 280 words ({word_count})"
+
+    # Must contain article URL
+    if article_url not in post:
+        return False, "Missing article URL"
+
+    # Must have 3-5 hashtags
+    hashtags = re.findall(r"#\w+", post)
+    if len(hashtags) < 3 or len(hashtags) > 5:
+        return False, f"Hashtag count {len(hashtags)} not in 3-5 range"
+
+    return True, ""
+
 
 def _call_gemini(client: genai.Client, model: str, prompt: str) -> str:
     @retry(
-        retry=retry_if_exception_type(ServerError),
+        retry=retry_if_exception(_is_retryable_error),
         stop=stop_after_attempt(GEMINI_MAX_RETRIES),
         wait=wait_exponential(min=GEMINI_RETRY_WAIT_MIN, max=GEMINI_RETRY_WAIT_MAX),
         before_sleep=lambda state: logger.warning(
-            "Gemini %s returned server error, retrying (attempt %d/%d)...",
+            "Gemini %s returned retryable error, retrying (attempt %d/%d)...",
             model, state.attempt_number, GEMINI_MAX_RETRIES,
         ),
         reraise=True,
     )
     def _invoke():
         response = client.models.generate_content(model=model, contents=prompt)
-        return response.text.strip()
+        text = response.text
+        if not text or not text.strip():
+            raise ValueError("Empty response from Gemini")
+        return text.strip()
 
     return _invoke()
 
@@ -63,23 +107,49 @@ def generate_linkedin_post(article: Article) -> str:
 
     client = genai.Client(api_key=GEMINI_API_KEY)
 
+    # Prompt-injection guard: truncate and sanitize article text
+    safe_title = article.title[:200]
+    safe_source = article.source[:100]
+    safe_summary = article.summary[:500]
+    safe_url = article.url[:500]
+
     prompt = PROMPT_TEMPLATE.format(
-        title=article.title,
-        source=article.source,
-        summary=article.summary,
-        url=article.url,
+        title=safe_title,
+        source=safe_source,
+        summary=safe_summary,
+        url=safe_url,
     )
 
+    # Try primary model
     try:
-        return _call_gemini(client, GEMINI_MODEL, prompt)
-    except ServerError:
-        logger.warning(
-            "Primary model %s unavailable after %d retries, falling back to %s",
-            GEMINI_MODEL, GEMINI_MAX_RETRIES, GEMINI_FALLBACK_MODEL,
-        )
+        post = _call_gemini(client, GEMINI_MODEL, prompt)
+        valid, err = _validate_post(post, safe_url)
+        if valid:
+            return post
+        logger.warning("Primary model post validation failed: %s. Retrying once...", err)
+        # Retry once with same model
+        post = _call_gemini(client, GEMINI_MODEL, prompt)
+        valid, err = _validate_post(post, safe_url)
+        if valid:
+            return post
+        logger.warning("Primary model retry validation failed: %s. Falling back...", err)
+    except Exception as exc:
+        logger.warning("Primary model %s failed: %s. Falling back...", GEMINI_MODEL, exc)
 
+    # Try fallback model
     try:
-        return _call_gemini(client, GEMINI_FALLBACK_MODEL, prompt)
+        post = _call_gemini(client, GEMINI_FALLBACK_MODEL, prompt)
+        valid, err = _validate_post(post, safe_url)
+        if valid:
+            return post
+        logger.warning("Fallback model post validation failed: %s. Retrying once...", err)
+        post = _call_gemini(client, GEMINI_FALLBACK_MODEL, prompt)
+        valid, err = _validate_post(post, safe_url)
+        if valid:
+            return post
+        logger.error("Fallback model retry validation failed: %s", err)
     except Exception as exc:
         logger.error("Fallback model %s also failed: %s", GEMINI_FALLBACK_MODEL, exc)
         raise
+
+    raise ValueError("All models failed validation")
