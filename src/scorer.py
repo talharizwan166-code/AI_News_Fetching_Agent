@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timezone
 from src.fetcher import Article
 from src.config import SCORING_WEIGHTS, SOURCE_CREDIBILITY
+from src.utils import strip_html
 
 AI_KEYWORDS = [
     "artificial intelligence", "machine learning", "deep learning", "neural network",
@@ -35,18 +36,6 @@ _INNOV_PATTERNS = [re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE) for kw in 
 # Exported for AI relevance filtering
 AI_RELEVANCE_PATTERNS = _AI_PATTERNS
 
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
-_WHITESPACE_RE = re.compile(r"\s+")
-
-
-def _strip_html(text: str) -> str:
-    """Remove HTML tags and normalize whitespace."""
-    if not text:
-        return ""
-    text = _HTML_TAG_RE.sub(" ", text)
-    text = _WHITESPACE_RE.sub(" ", text)
-    return text.strip()
-
 
 def _keyword_score(text: str, patterns: list[re.Pattern]) -> float:
     """Score based on word-boundary regex matches."""
@@ -59,7 +48,7 @@ def _keyword_score(text: str, patterns: list[re.Pattern]) -> float:
 
 def ai_relevance_score(text: str) -> float:
     """Public function to compute AI relevance score for filtering."""
-    clean_text = _strip_html(text)
+    clean_text = strip_html(text)
     return _keyword_score(clean_text, AI_RELEVANCE_PATTERNS)
 
 
@@ -85,7 +74,7 @@ def _freshness_score(published_at: str) -> float:
 
 def score_article(article: Article) -> float:
     # Strip HTML from summary before scoring
-    clean_summary = _strip_html(article.summary)
+    clean_summary = strip_html(article.summary)
     text = f"{article.title} {clean_summary}"
 
     ai_score = _keyword_score(text, _AI_PATTERNS)

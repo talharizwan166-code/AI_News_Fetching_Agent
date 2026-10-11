@@ -12,6 +12,7 @@ jobs:
   handle-comment:
     if: contains(github.event.issue.labels.*.name, 'linkedin-pending')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check comment
@@ -75,10 +76,20 @@ jobs:
         with:
           script: |
             const body = context.payload.issue.body || '';
-            const postMatch = body.match(/<!-- POST_START -->([\s\S]*?)<!-- POST_END -->/);
-            const postText = postMatch ? postMatch[1].trim() : '';
-            const urlMatch = body.match(/<!-- ARTICLE_URL:(.*?) -->/);
-            const articleUrl = urlMatch ? urlMatch[1].trim() : '';
+            // Parse base64-encoded marker
+            const markerMatch = body.match(/<!-- POST_MARKER:([\s\S]*?)-->/);
+            if (!markerMatch) {
+              // Fallback to old format
+              const postMatch = body.match(/<!-- POST_START -->([\s\S]*?)<!-- POST_END -->/);
+              const postText = postMatch ? postMatch[1].trim() : '';
+              const urlMatch = body.match(/<!-- ARTICLE_URL:(.*?) -->/);
+              const articleUrl = urlMatch ? urlMatch[1].trim() : '';
+            } else {
+              const data = JSON.parse(Buffer.from(markerMatch[1], 'base64').toString());
+              const postText = data.post;
+              const articleUrl = data.url;
+              const articleTitle = data.title;
+            }
             const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleUrl)}`;
 
             await github.rest.issues.createComment({
@@ -118,33 +129,43 @@ jobs:
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          LINKEDIN_API_VERSION: "202401"
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           python -c "
-          import os, re, sys
+          import os, re, sys, json, base64
           sys.path.insert(0, '.')
           from src.linkedin_poster import post_to_linkedin
 
           body = os.environ['ISSUE_BODY']
 
-          post_match = re.search(r'<!-- POST_START -->(.*?)<!-- POST_END -->', body, re.DOTALL)
-          if not post_match:
-              print('ERROR: Could not find post text in issue body')
-              sys.exit(1)
-
-          post_text = post_match.group(1).strip()
-
-          url_match = re.search(r'<!-- ARTICLE_URL:(.*?) -->', body)
-          article_url = url_match.group(1).strip() if url_match else ''
-
-          title_match = re.search(r'<!-- ARTICLE_TITLE:(.*?) -->', body)
-          article_title = title_match.group(1).strip() if title_match else ''
+          # Parse base64-encoded marker (new format)
+          marker_match = re.search(r'<!-- POST_MARKER:([\s\S]*?)-->', body)
+          if marker_match:
+              data = json.loads(base64.b64decode(marker_match.group(1)).decode())
+              post_text = data['post']
+              article_url = data['url']
+              article_title = data['title']
+          else:
+              # Fallback to old format
+              post_match = re.search(r'<!-- POST_START -->(.*?)<!-- POST_END -->', body, re.DOTALL)
+              post_text = post_match.group(1).strip() if post_match else ''
+              url_match = re.search(r'<!-- ARTICLE_URL:(.*?) -->', body)
+              article_url = url_match.group(1).strip() if url_match else ''
+              title_match = re.search(r'<!-- ARTICLE_TITLE:(.*?) -->', body)
+              article_title = title_match.group(1).strip() if title_match else ''
 
           print(f'Posting to LinkedIn ({len(post_text)} chars)...')
           print(f'Article: {article_title}')
           print(f'URL: {article_url}')
-          post_to_linkedin(post_text, article_url=article_url, article_title=article_title)
-          print('Posted successfully!')
+          try:
+              post_to_linkedin(post_text, article_url=article_url, article_title=article_title)
+              print('Posted successfully!')
+          except Exception as e:
+              if '401' in str(e) or 'Unauthorized' in str(e):
+                  print('ERROR: LinkedIn token expired or invalid (401)')
+                  sys.exit(2)  # Special exit code for token expiry
+              raise
           "
 
       - name: Comment and close (approved)
@@ -175,6 +196,22 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
               state: 'closed'
+            });
+
+      - name: Handle token expired
+        if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto' && failure() && steps.post-linkedin.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '**LinkedIn posting failed: Access token expired or invalid (401).**\n',
+                'Please regenerate your LinkedIn access token and update the `LINKEDIN_ACCESS_TOKEN` GitHub Secret.\n',
+                'Then comment `approve` again to retry.'
+              ].join('\n')
             });
 
       - name: Comment and close (rejected)

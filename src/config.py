@@ -8,9 +8,11 @@ RSS_FEEDS = {
     "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
     "The Verge AI": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
     "Ars Technica AI": "https://feeds.arstechnica.com/arstechnica/technology-lab",
-    "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",
+    "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",  # Often rate-limited (429)
     "Google AI Blog": "https://blog.google/technology/ai/rss/",
     "OpenAI Blog": "https://openai.com/blog/rss.xml",
+    "AI Weekly": "https://aiweekly.co/rss/",
+    "KDnuggets AI": "https://www.kdnuggets.com/feed",
 }
 
 FETCH_TIMEOUT_SECONDS = int(os.getenv("FETCH_TIMEOUT_SECONDS", "15"))
@@ -31,6 +33,8 @@ SOURCE_CREDIBILITY = {
     "VentureBeat AI": 0.80,
     "Google AI Blog": 0.90,
     "OpenAI Blog": 0.90,
+    "AI Weekly": 0.85,
+    "KDnuggets AI": 0.85,
 }
 
 MIN_QUALITY_THRESHOLD = float(os.getenv("MIN_QUALITY_THRESHOLD", "0.25"))
@@ -52,6 +56,7 @@ EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
 
 LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
 LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN", "")
+LINKEDIN_API_VERSION = os.getenv("LINKEDIN_API_VERSION", "202401")
 
 DB_PATH = os.getenv("DB_PATH", "news_agent.db")
 

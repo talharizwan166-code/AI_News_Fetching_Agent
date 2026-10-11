@@ -40,6 +40,42 @@ def setup_logging() -> None:
         logging.getLogger("feedparser").setLevel(logging.WARNING)
 
 
+def check_env_not_tracked() -> bool:
+    """Check that .env is not tracked by git."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", ".env"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            logging.error(".env is tracked by git! This is a security risk.")
+            logging.error("Run: git rm --cached .env && echo '.env' >> .gitignore")
+            return False
+    except FileNotFoundError:
+        # git not available, skip check
+        pass
+    return True
+
+
+def check_secrets_rotation() -> None:
+    """Remind about rotating secrets periodically."""
+    import datetime
+    from pathlib import Path
+
+    env_path = Path(".env")
+    if env_path.exists():
+        mtime = datetime.datetime.fromtimestamp(env_path.stat().st_mtime)
+        age_days = (datetime.datetime.now() - mtime).days
+        if age_days > 90:
+            logging.warning(
+                "SECURITY REMINDER: .env file is %d days old. "
+                "Consider rotating Gemini API key and Gmail app password.",
+                age_days
+            )
+
+
 def validate_config() -> bool:
     """Validate all required configuration is present."""
     is_valid, missing = config.validate()
@@ -53,7 +89,7 @@ def validate_config() -> bool:
 
 
 def parse_args() -> dict:
-    """Parse command-line arguments."""
+    """Parse command-line arguments and DRY_RUN env var."""
     import argparse
 
     parser = argparse.ArgumentParser(description="AI News Agent")
@@ -67,7 +103,13 @@ def parse_args() -> dict:
         action="store_true",
         help="Enable debug logging (overrides LOG_LEVEL)",
     )
-    return vars(parser.parse_args())
+    args = vars(parser.parse_args())
+
+    # Also check DRY_RUN env var
+    if not args["dry_run"] and os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes"):
+        args["dry_run"] = True
+
+    return args
 
 
 def main() -> int:
@@ -89,6 +131,11 @@ def main() -> int:
     logger.info("=" * 60)
 
     try:
+        # Security checks
+        if not check_env_not_tracked():
+            return 1
+        check_secrets_rotation()
+
         # Validate configuration
         if not validate_config():
             return 1

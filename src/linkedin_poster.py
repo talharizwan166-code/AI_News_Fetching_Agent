@@ -3,7 +3,7 @@ import logging
 import urllib.request
 import urllib.error
 
-from src.config import LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN
+from src.config import LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN, LINKEDIN_API_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def post_to_linkedin(
         data=json.dumps(data).encode(),
         headers={
             "Authorization": f"Bearer {LINKEDIN_ACCESS_TOKEN}",
-            "LinkedIn-Version": "202401",
+            "LinkedIn-Version": LINKEDIN_API_VERSION,
             "Content-Type": "application/json",
             "X-Restli-Protocol-Version": "2.0.0",
         },
@@ -54,9 +54,14 @@ def post_to_linkedin(
     )
 
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             logger.info("Posted to LinkedIn successfully (status %d)", resp.status)
     except urllib.error.HTTPError as exc:
         body = exc.read().decode()
         logger.error("LinkedIn API error %d: %s", exc.code, body)
+        if exc.code == 401:
+            raise ValueError(f"LinkedIn token expired or invalid (401): {body}") from exc
+        raise
+    except urllib.error.URLError as exc:
+        logger.error("LinkedIn network error: %s", exc)
         raise

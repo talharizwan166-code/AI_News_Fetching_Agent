@@ -63,10 +63,12 @@ def test_raises_without_api_key():
 @patch("src.generator.GEMINI_API_KEY", "fake-key")
 @patch("src.generator.genai")
 def test_retries_on_server_error_then_succeeds(mock_genai):
-    mock_client = _mock_client_with_response("")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = _VALID_POST
     mock_client.models.generate_content.side_effect = [
         _server_error(),
-        _VALID_POST,
+        mock_response,
     ]
     mock_genai.Client.return_value = mock_client
 

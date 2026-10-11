@@ -23,7 +23,7 @@
    - `--dry-run` flag runs fetch→dedup→score→select→generate
    - Prints selected article, score, and generated LinkedIn post
    - No email, no GitHub issue, no DB write
-   - Also supports `DRY_RUN=1` env var (via args parsing)
+   - **Also supports `DRY_RUN=1` env var (via args parsing)** ✅ FIXED
 
 5. **Logging** - Centralized logging:
    - `LOG_LEVEL` env var controls verbosity (DEBUG, INFO, WARNING, ERROR)
@@ -36,49 +36,59 @@
 - Added config validation for scoring weights sum = 1.0 and threshold ranges (Defect 19, partial)
 
 ### Tests:
-- All 40 tests pass
+- All 42 tests pass
 - Updated test fixtures with AI-relevant article content to pass AI relevance filter
 
 ---
 
-## Phase 2: Defects 4-7, 11, 12, 14, 15, 19 ⏳ IN PROGRESS
+## Phase 2: Defects 4-7, 11, 12, 14, 15, 19 ✅ COMPLETE
 
 ### Done:
 - **Defect 4** ✅: `requests.get(timeout)` + `feedparser.parse(content)`; per-feed logging; one failed feed doesn't stop run (tested with VentureBeat 429)
 - **Defect 5** ✅: Configurable AI-relevance gate (MIN_AI_RELEVANCE)
 - **Defect 6** ✅: Word-boundary regex keyword matching; HTML stripping from summaries
 - **Defect 7** ✅: Stronger dedup - strip utm_*/fragments, normalize URLs, compare titles against published history
+- **Defect 11** ✅: Validate generated post (≤280 words, contains URL, 3-5 hashtags, retry once); prompt-injection guard (in generator.py)
+- **Defect 12** ✅: Handle 429 and empty/None response from Gemini; env overrides for models (in generator.py, config.py)
+- **Defect 14** ✅: Verify RSS URLs alive; `python -m src.check_feeds` command (added 2 new feeds: AI Weekly, KDnuggets AI; 8/9 feeds alive)
+- **Defect 15** ✅: DB context managers, index on normalized_url, store normalized URL, migration path for existing news_agent.db
+- **Defect 19** ✅: Env-configurable MIN_QUALITY_THRESHOLD, MIN_AI_RELEVANCE, FETCH_TIMEOUT_SECONDS, scoring weights; validate sum=1.0 (in config.py)
 
-### To do:
-- **Defect 11**: Validate generated post (≤280 words, contains URL, 3-5 hashtags, retry once); prompt-injection guard
-- **Defect 12**: Handle 429 and empty/None response from Gemini
-- **Defect 14**: Verify RSS URLs alive; `python -m src.check_feeds` command
-- **Defect 15**: DB context managers, index on url, store normalized URL, migration path
-- **Defect 19**: Complete env-configurable all thresholds/weights; validate sum=1.0
-
----
-
-## Phase 3: Defects 8, 9, 10, 13 + CI ⏳ PENDING
-
-### To do:
-- **Defect 8**: DB persistence on orphan `data` branch (workflow specified)
-- **Defect 9**: Concurrency group + "already ran today" guard
-- **Defect 10**: Issue-body marker injection (base64/JSON); timeout on urlopen
-- **Defect 13**: LinkedIn API version from config; 401 handling; merge setup scripts
-- **CI**: tests.yml, pinned actions, timeout-minutes
+### Tests:
+- All 42 tests pass
+- Dry-run works end-to-end
 
 ---
 
-## Phase 4: Defects 16-18 + README ⏳ PENDING
+## Phase 3: Defects 8, 9, 10, 13 + CI ✅ COMPLETE
 
-### To do:
-- **Defect 16**: Rotate secrets reminder; pre-run check .env not tracked; complete .env.example
-- **Defect 17**: UTF-8 README; LICENSE diff check
-- **Defect 18**: .gitignore: logs/, .venv/, .DS_Store, *.log
+### Done:
+- **Defect 8** ✅: DB persistence on orphan `data` branch (workflow specified) - news_agent.yml uses git worktree with data branch
+- **Defect 9** ✅: Concurrency group + "already ran today" guard (checks successful runs today, skips backup if primary succeeded)
+- **Defect 10** ✅: Issue-body marker injection (base64/JSON in POST_MARKER); timeout=30 on all urlopen calls
+- **Defect 13** ✅: LinkedIn API version from config (LINKEDIN_API_VERSION); 401 handling with clear "token expired" error; merged setup scripts (setup_linkedin.py using /v2/userinfo, no hardcoded client ID/secret)
+- **CI** ✅: tests.yml workflow with pinned actions (checkout@v4.2.2, setup-python@v5.4.0, github-script@v7.0.1), timeout-minutes on all jobs
+
+### Tests:
+- All 42 tests pass
+- Dry-run works end-to-end
 
 ---
 
-## Phase 5: Final Verification ⏳ PENDING
+## Phase 4: Defects 16-18 + README ✅ COMPLETE
+
+### Done:
+- **Defect 16** ✅: Rotate secrets reminder (90-day check); pre-run check .env not tracked; complete .env.example with all config options
+- **Defect 17** ✅: UTF-8 README (was UTF-16); LICENSE verified (standard MIT)
+- **Defect 18** ✅: .gitignore updated with logs/, .venv/, .DS_Store, *.log
+
+### Tests:
+- All 42 tests pass
+- Dry-run works end-to-end
+
+---
+
+## Phase 5: Final Verification ⏳ IN PROGRESS
 
 ### To do:
 - Full pytest run
@@ -90,5 +100,5 @@
 
 ## Next Command to Run:
 ```bash
-# Start Phase 2 - implement Defect 4 (fetch with requests + timeout)
+# Phase 5 - Full verification
 ```

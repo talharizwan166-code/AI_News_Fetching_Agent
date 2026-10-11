@@ -8,7 +8,7 @@ from src.selector import select_best_article
 from src.generator import generate_linkedin_post
 from src.emailer import send_email
 from src.github_issues import create_approval_issue
-from src.database import init_db, save_article
+from src.database import init_db, save_article, migrate_db
 from src.config import MIN_QUALITY_THRESHOLD, MIN_AI_RELEVANCE
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
         logger.info("DRY RUN MODE: No email, no issue, no DB write")
 
     init_db()
+    migrate_db()
 
     logger.info("Step 1: Fetching articles...")
     articles = fetch_all_feeds()
