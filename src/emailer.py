@@ -1,8 +1,11 @@
 import html as html_lib
 import logging
 import smtplib
+import socket
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr, make_msgid
 from urllib.parse import quote
 
 from src.fetcher import Article
@@ -16,11 +19,13 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
+# SMTP retry configuration
+SMTP_MAX_RETRIES = 3
+SMTP_RETRY_DELAY_SECONDS = 5
 
-def send_email(article: Article, linkedin_post: str, issue_url: str = "") -> None:
-    if not all([EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECIPIENT]):
-        raise ValueError("Email credentials are not fully configured")
 
+def _create_message(article: Article, linkedin_post: str, issue_url: str = "") -> MIMEMultipart:
+    """Create the email message with proper headers for deliverability."""
     linkedin_share_url = (
         "https://www.linkedin.com/sharing/share-offsite/?url="
         + quote(article.url, safe="")
@@ -35,8 +40,11 @@ def send_email(article: Article, linkedin_post: str, issue_url: str = "") -> Non
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"AI News Agent: {article.title}"
-    msg["From"] = EMAIL_SENDER
+    msg["From"] = formataddr(("AI News Agent", EMAIL_SENDER))
     msg["To"] = EMAIL_RECIPIENT
+    msg["Message-ID"] = make_msgid(domain=EMAIL_SENDER.split("@")[-1])
+    msg["Auto-Submitted"] = "auto-generated"
+    msg["Precedence"] = "bulk"
 
     approve_text = ""
     if issue_url:
@@ -77,7 +85,7 @@ This email was sent automatically by AI News Agent.
      style="display:inline-block; background:#28a745; color:#ffffff;
             padding:14px 32px; border-radius:6px; text-decoration:none;
             font-size:16px; font-weight:bold;">
-    Review &amp; Approve Post
+    Review & Approve Post
   </a>
 </div>"""
 
@@ -111,15 +119,52 @@ This email was sent automatically by AI News Agent.
 <p style="color:#888; font-size:12px;">Sent automatically by AI News Agent.</p>
 </body></html>"""
 
-    msg.attach(MIMEText(body, "plain"))
-    msg.attach(MIMEText(html, "html"))
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    return msg
 
-    try:
-        with smtplib.SMTP(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_SENDER, EMAIL_RECIPIENT, msg.as_string())
-        logger.info("Email sent to %s", EMAIL_RECIPIENT)
-    except Exception as exc:
-        logger.error("Failed to send email: %s", exc)
-        raise
+
+def _send_with_retry(msg: MIMEMultipart) -> None:
+    """Send email with retry logic for transient failures."""
+    last_exception = None
+
+    for attempt in range(1, SMTP_MAX_RETRIES + 1):
+        try:
+            with smtplib.SMTP(EMAIL_SMTP_HOST, EMAIL_SMTP_PORT, timeout=30) as server:
+                server.set_debuglevel(0)
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+                server.sendmail(EMAIL_SENDER, EMAIL_RECIPIENT, msg.as_string())
+            logger.info("Email sent successfully to %s (attempt %d/%d)", EMAIL_RECIPIENT, attempt, SMTP_MAX_RETRIES)
+            return
+        except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused) as exc:
+            # These are permanent failures - don't retry
+            logger.error("Permanent SMTP error (no retry): %s", exc)
+            raise
+        except (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError, socket.timeout, socket.gaierror, OSError) as exc:
+            # These are transient - retry
+            last_exception = exc
+            logger.warning("Transient SMTP error on attempt %d/%d: %s", attempt, SMTP_MAX_RETRIES, exc)
+            if attempt < SMTP_MAX_RETRIES:
+                time.sleep(SMTP_RETRY_DELAY_SECONDS * attempt)  # Exponential backoff
+        except smtplib.SMTPException as exc:
+            # Other SMTP errors - log and retry
+            last_exception = exc
+            logger.warning("SMTP error on attempt %d/%d: %s", attempt, SMTP_MAX_RETRIES, exc)
+            if attempt < SMTP_MAX_RETRIES:
+                time.sleep(SMTP_RETRY_DELAY_SECONDS * attempt)
+
+    # All retries exhausted
+    logger.error("Failed to send email after %d attempts. Last error: %s", SMTP_MAX_RETRIES, last_exception)
+    raise last_exception
+
+
+def send_email(article: Article, linkedin_post: str, issue_url: str = "") -> None:
+    """Send email with retry logic and improved deliverability."""
+    if not all([EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECIPIENT]):
+        raise ValueError("Email credentials are not fully configured")
+
+    msg = _create_message(article, linkedin_post, issue_url)
+    _send_with_retry(msg)
