@@ -85,7 +85,7 @@ This email was sent automatically by AI News Agent.
      style="display:inline-block; background:#28a745; color:#ffffff;
             padding:14px 32px; border-radius:6px; text-decoration:none;
             font-size:16px; font-weight:bold;">
-    Review & Approve Post
+    Review &amp; Approve Post
   </a>
 </div>"""
 
