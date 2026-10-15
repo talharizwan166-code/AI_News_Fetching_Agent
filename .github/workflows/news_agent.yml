@@ -52,6 +52,20 @@ jobs:
             git -C data-branch commit --allow-empty -m "Initialize data branch"
           fi
 
+          python - <<'PY'
+          from src.database import get_connection, init_db, seed_from_json
+
+          db_path = "data-branch/news_agent.db"
+          init_db(db_path)
+          with get_connection(db_path) as conn:
+              count = conn.execute("SELECT COUNT(*) FROM published_articles").fetchone()[0]
+          if count == 0:
+              added = seed_from_json(db_path, "data/seed_published.json")
+              print(f"Seeded {added} published articles into the empty database.")
+          else:
+              print(f"Database already has {count} published articles; skipping seed.")
+          PY
+
       - name: Check if already ran today (skip backup if primary succeeded)
         id: check
         uses: actions/github-script@v7.0.1

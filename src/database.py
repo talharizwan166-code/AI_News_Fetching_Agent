@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -136,3 +137,34 @@ def get_published_normalized_urls(
     with get_connection(db_path) as conn:
         rows = conn.execute("SELECT normalized_url FROM published_articles").fetchall()
         return {row["normalized_url"] for row in rows}
+
+
+def seed_from_json(db_path: str, json_path: str) -> int:
+    """Import published history idempotently; never overwrite existing articles."""
+    articles = json.loads(Path(json_path).read_text(encoding="utf-8"))
+    if not isinstance(articles, list):
+        raise ValueError("Published history seed must be a list")
+    for article in articles:
+        if not isinstance(article, dict) or any(
+            not isinstance(article.get(key), str) or not article[key].strip()
+            for key in ("url", "title", "source")
+        ):
+            raise ValueError("Each seed record needs non-empty url, title and source")
+
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        for article in articles:
+            normalized = normalize_url(article["url"])
+            conn.execute("""
+                INSERT OR IGNORE INTO published_articles
+                    (url, normalized_url, title, source, created_at)
+                SELECT ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM published_articles WHERE normalized_url = ?
+                )
+            """, (
+                article["url"], normalized, article["title"], article["source"],
+                datetime.now(timezone.utc).isoformat(), normalized,
+            ))
+        conn.commit()
+        return conn.total_changes
