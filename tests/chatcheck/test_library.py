@@ -13,8 +13,8 @@ SAMPLES = read_json(Path(__file__).parent / "fixtures/clothing_store_responses.j
 
 
 def test_library_is_balanced_and_has_ground_truth_metadata():
-    assert len(CASES) == 64
-    assert Counter(case.category for case in CASES) == {category: 8 for category in CATEGORIES}
+    assert len(CASES) == 76
+    assert Counter(case.category for case in CASES[:64]) == {category: 8 for category in CATEGORIES}
     assert {case.id for case in CASES} == set(SAMPLES)
     assert all(case.language and case.severity and case.expected_behavior and case.tags for case in CASES)
     assert all("private-fixture" in case.tags for case in CASES if case.category == "data_leakage")

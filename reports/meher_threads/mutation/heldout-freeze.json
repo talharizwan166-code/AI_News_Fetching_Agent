@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-10-15T15:53:03.852851+00:00",
+  "hash_algorithm": "SHA-256 of UTF-8 text with universal LF newlines",
+  "purpose": "Pre-evaluation freeze: do not tune bot or checks using held-out outcomes.",
+  "files": {
+    "chatcheck/__init__.py": "844fec11ab3cf24341ed562e142647838f9ff1230252101a49d3831133458a12",
+    "chatcheck/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "chatcheck/cli.py": "1b9c6269fb058fa5692d36ec56ad7a00a208207661cc570f4b33c68ca576243a",
+    "chatcheck/connectors.py": "2d311a30e26fce345958e07a3ea4993b310e2b66fa36efbcccc4495552bf61dd",
+    "chatcheck/judge.py": "c8898e68cc08463e650bba75204bb74be6c2cc415d9dc3f71ba60bcb6fb07daf",
+    "chatcheck/mock_server.py": "42269f4f560b9fae6def6bcb7c1532b784a0143873ba88504cf060e2ec93e4fa",
+    "chatcheck/models.py": "72ba9617a22b3c35bfe97b617b404b6d4b2c219e1c2e18e76947f67de77922f6",
+    "chatcheck/runner.py": "6880dedc57ecb5ff61c00645d83311952e5999f2c80c5d836b3ef79d08ce1b4d",
+    "chatcheck/storage.py": "debf5eda4eb1206eabe18267dc1761479c8a5ae4b917b88cacdef494d2cbe73b",
+    "demo_bots/meher_threads/__init__.py": "496e628a252d6634610d57c9092f70ab7e2208e217dfbc5d25d35a7eb5e66d7f",
+    "demo_bots/meher_threads/__main__.py": "540fd0a5992ca535482a9d44b2e268ce3a39bb47a0576f301214afa5ef4494b9",
+    "demo_bots/meher_threads/bot.py": "af57337bd04ca539d0a54e9aeb4dfb427d9fae1fb83d411dbc96585b797882f0",
+    "demo_bots/meher_threads/compare.py": "897e44fe588d10c88d8a14b9389254a045aec7daa2305226c9ccd02fefcfe586",
+    "demo_bots/meher_threads/knowledge.py": "c74be9ced16ac495cae715caced7b708995e727cde38b12a2255ebda5cf2930a",
+    "demo_bots/meher_threads/llm.py": "28a5c794d4f028b11bc6ae74d2fdd1374bfe85ecdef2dd954ac41501c4112b9e",
+    "demo_bots/meher_threads/mutants.json": "5cd4e73a346e02acf5d8afa9935abe5356ff6604eb30aa69d50a95c877018c2f",
+    "demo_bots/meher_threads/mutants.py": "212e6c3244be032598a96d1312a9a3e5c5f1573588ad7a0a31d2f9c02deb5d70",
+    "demo_bots/meher_threads/mutation.py": "61218e0e6e79ff59d580d0292f1b9f1cd9806f1c2e22f19d3e9d1371f1923449",
+    "demo_bots/meher_threads/server.py": "2781c9e177d790f9792a590ac3114d09ec0243e515a56d5679aea655555c420b",
+    "examples/chatcheck/kb/faq.md": "dfb7b68a9cb0505ec1030b3e8751ad6d81adef5f882a76b6add6f215579c84e7",
+    "examples/chatcheck/private-fixture.md": "cfaba57ccd76c05a23fa39cff97c952006b16ca2f472b534d47190a79d5f0532",
+    "scripts/build_chatcheck_library.py": "9a0ebff8a522d3cd871d80a04909a5a89709c6ab2fe29af4431c6abe49086e0e",
+    "suites/clothing_store.json": "9dc88fc23a80dd5f32fcbd983703671d3025c64c56865feb94f21035569eff9f",
+    "suites/clothing_store_heldout.json": "9609a651fe64a482113fbfe7317657571e01a13fc3dd91eaea7b1e556fafd9f3"
+  }
+}

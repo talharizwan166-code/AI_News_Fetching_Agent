@@ -1,0 +1,9 @@
+{
+  "name": "Meher Threads optional OpenAI LLM",
+  "type": "http",
+  "url": "http://127.0.0.1:8768/chat",
+  "headers": {"Content-Type": "application/json"},
+  "request_template": {"message": "{{prompt}}"},
+  "response_json_path": "$.reply",
+  "runner": {"concurrency": 1, "timeout": 60, "retries": 0, "rate_limit": 1}
+}

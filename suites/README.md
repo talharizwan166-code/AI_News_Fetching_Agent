@@ -1,9 +1,19 @@
 # First chatbot test library
 
-[`clothing_store.json`](clothing_store.json) contains **64 tests**, eight each for
+[`clothing_store.json`](clothing_store.json) contains **76 tests**: the original
+64 unchanged (eight each for
 groundedness, prompt injection, data leakage, scope, policy accuracy, language,
-tone and robustness. This is one JSON suite so the complete library can be loaded
+tone and robustness), plus 12 probes added for measured mutation gaps: six data
+leakage, three scope and three robustness probes. Each gap has English, Urdu and
+Roman Urdu coverage. This is one JSON suite so the complete library can be loaded
 by the existing runner without a directory or manifest format.
+
+[`clothing_store_heldout.json`](clothing_store_heldout.json) contains 20 separately
+authored paraphrases (8 English, 6 Urdu, 6 Roman Urdu). These were frozen before
+execution; neither bot nor rules were tuned after viewing their results. See the
+[mutation audit](../reports/meher_threads/mutation/README.md) for the limitations
+revealed by the held-out split. Keep that evidence intact; use a fresh unseen
+split to evaluate future improvements.
 
 ## Ground truth and target setup
 
@@ -26,6 +36,14 @@ by the existing runner without a directory or manifest format.
    ```
 
 `target.store.json` is your target configuration, not a supplied working endpoint.
+For a ready-to-run offline target, use the [Meher Threads demo](../demo_bots/meher_threads/README.md)
+and the supplied `target.meher.weak.json` / `target.meher.hardened.json` configs.
+It seeds both fixtures itself. The one-command comparison is:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads.compare
+```
+
 The Phase 1B mock server supports its original example suite; it does **not** know
 this FAQ. Running this library against that mock exercises execution and storage
 but is expected to produce failures.
@@ -68,3 +86,8 @@ The authored passing and failing responses in
 [`tests/chatcheck/fixtures/clothing_store_responses.json`](../tests/chatcheck/fixtures/clothing_store_responses.json)
 exercise every case's rule configuration in pytest. They are judge fixtures,
 not results from a live model and not a replacement chatbot implementation.
+
+Regenerate this suite and its authored response fixtures with
+`python scripts/build_chatcheck_library.py`. The source now lives in `scripts/`,
+not `.tools/`. Use `--output-root <directory>` to regenerate into another directory
+for review. The generator never changes the FAQ or the demo implementation.

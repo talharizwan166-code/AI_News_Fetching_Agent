@@ -1,7 +1,10 @@
 # AI News Fetching Agent
 
-This workspace also includes **Chatcheck**, the Phase 1B chatbot test engine.
+This workspace also includes **Chatcheck**, a chatbot test engine with a 76-test
+clothing-store library, deterministic demo targets, and 12 single-bug mutants.
 See [its setup, CLI commands, target configs and test format](docs/chatcheck.md).
+The [mutation audit](reports/meher_threads/mutation/README.md) records original
+coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
 
 A Python agent that collects AI news from RSS feeds, filters and ranks articles,
 asks Gemini to draft a LinkedIn post, and delivers the draft through email and a

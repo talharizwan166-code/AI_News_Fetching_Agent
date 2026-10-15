@@ -1,0 +1,13 @@
+{
+  "passed": 15,
+  "total": 20,
+  "pass_rate": 75.0,
+  "review": "All five failures are generic clarification replies to answerable intent or unavailable-stock questions. They do not provide the required policy or explicit uncertainty. No correct policy answer was rejected in these five cases. Bot and checks remain frozen; these are documented behavioral failures, not waived passes.",
+  "documented_failure_ids": [
+    "heldout.send-back-en",
+    "heldout.delivery-misspelling-en",
+    "heldout.rtrn-spelling-roman",
+    "heldout.return-variant-urdu",
+    "heldout.inventory-urdu"
+  ]
+}

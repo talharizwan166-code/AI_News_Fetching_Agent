@@ -47,7 +47,7 @@ jobs:
           python -c "
           import ast
           from pathlib import Path
-          files = [*Path('.').glob('*.py'), *Path('src').rglob('*.py'), *Path('chatcheck').rglob('*.py'), *Path('tests').rglob('*.py')]
+          files = [*Path('.').glob('*.py'), *Path('src').rglob('*.py'), *Path('chatcheck').rglob('*.py'), *Path('demo_bots').rglob('*.py'), *Path('scripts').rglob('*.py'), *Path('tests').rglob('*.py')]
           for path in files:
               ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
           print('All Python files have valid syntax')

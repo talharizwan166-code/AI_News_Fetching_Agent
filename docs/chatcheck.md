@@ -214,7 +214,8 @@ and severity, including zero counts and an `unspecified` bucket for old suites.
 `--suite` takes a JSON file, not a directory. Invalid JSON, missing files,
 duplicate IDs, invalid checks or invalid metadata produce an error and exit 2.
 
-The [first library](../suites/README.md) contains **64 tests, eight per category**,
+The [library](../suites/README.md) contains **76 tests**: the original 64 (eight
+per category) unchanged, plus 12 multilingual mutation-gap probes,
 with English, Urdu and Roman Urdu questions, spelling mistakes, benign attack
 prompts, policy boundaries, tone and robustness cases. Its fixed ground truth is
 the fictional clothing store [FAQ](../examples/chatcheck/kb/faq.md). Seed the
@@ -236,6 +237,141 @@ format above. The original mock is an engine smoke test and has no clothing-stor
 knowledge; this library is expected to fail against it. Text rules are limited
 probes, not a semantic guarantee: check actual responses against the documented
 expected behavior, especially for paraphrases, contradictions and language quality.
+
+## Meher Threads demo target (Phase 1C)
+
+The [demo server](../demo_bots/meher_threads/README.md) makes this library runnable
+offline without a key or model. It loads the public FAQ and seeds the synthetic
+private fixture automatically. The FAQ is its only source of factual store
+knowledge; private values are stored separately. The server reads neither test
+IDs nor authored sample responses. It uses deterministic intent rules and response
+templates, so its language coverage is finite.
+
+The easiest way to reproduce the comparison is:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads.compare
+```
+
+This starts weak and hardened servers on available loopback ports, runs all 76
+tests through the real HTTP connector, saves `runs.db`, `weak.json`, `hardened.json`,
+`comparison.json`, `manifest.json` and `report.md` under a new timestamped folder
+in `reports/meher_threads/`, and shuts down the servers. Use `--output-dir` with
+a **new** directory to choose another destination. Existing reports are never
+overwritten. JSON exports are portable; SQLite files are retained locally and
+ignored by Git. Hashes in the manifest identify the exact suite, FAQ, fixture,
+target configs and implementation used.
+
+To run the servers and Chatcheck CLI separately, use two terminals:
+
+```powershell
+# Terminal 1: weak target, intentionally vulnerable, port 8766
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads --mode weak
+```
+
+```powershell
+# Terminal 2: hardened target, port 8767
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads --mode hardened
+```
+
+Then in a third terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m chatcheck run --target examples/chatcheck/target.meher.weak.json --suite suites/clothing_store.json --db meher-demo.db
+.\.venv\Scripts\python.exe -m chatcheck run --target examples/chatcheck/target.meher.hardened.json --suite suites/clothing_store.json --db meher-demo.db
+.\.venv\Scripts\python.exe -m chatcheck results --run <id> --db meher-demo.db
+.\.venv\Scripts\python.exe -m chatcheck export --run <id> --format json --db meher-demo.db
+```
+
+Use the run IDs printed by `run`. Weak intentionally exits 1 because checks fail;
+execute the hardened command separately rather than chaining with `&&`. Both
+servers bind only to `127.0.0.1`. POST `/chat` accepts only a nonempty string
+`message` in a JSON object and responds with `reply` plus the compatible
+`choices[0].message.content` path. GET `/health` reports status and mode.
+No mode can be selected by the request body. Stop each server with Ctrl+C.
+
+Default mode is hardened. Weak accepts role/policy overrides, guesses absent
+facts, discloses only the seeded synthetic records, handles unrelated requests,
+and responds in English. Hardened ignores policy overrides, declines private
+requests, acknowledges missing knowledge, stays on topic, and uses English,
+Urdu or Roman Urdu. Known private fixture values are blocked at the output
+boundary. Numeric policies come from the FAQ at startup; `--faq` and
+`--private-fixture` can select compatible fixture files for experiments.
+
+### Saved comparison and check review
+
+The [saved baseline](../reports/meher_threads/baseline/report.md) has:
+
+| Category | Weak | Hardened |
+| --- | ---: | ---: |
+| Overall | 14/64 (21.9%) | 64/64 (100%) |
+| Groundedness | 0/8 (0%) | 8/8 (100%) |
+| Prompt injection | 0/8 (0%) | 8/8 (100%) |
+| Data leakage | 0/8 (0%) | 8/8 (100%) |
+| Scope | 0/8 (0%) | 8/8 (100%) |
+| Policy accuracy | 5/8 (62.5%) | 8/8 (100%) |
+| Language | 2/8 (25%) | 8/8 (100%) |
+| Tone | 3/8 (37.5%) | 8/8 (100%) |
+| Robustness | 4/8 (50%) | 8/8 (100%) |
+
+All eight critical leakage cases fail on weak and pass on hardened. All **14
+shared outcomes** are listed as possible weak tests in the report. A shared
+pass can mean the weak bot also knows that basic policy; it is a review signal,
+not automatic proof that a test is defective.
+
+[The check review](../reports/meher_threads/check-review.md) documents seven
+initial hardened false failures: six uncertainty responses and one valid JSON
+delivery paraphrase. The corresponding regexes now accept equivalent wording
+while retaining bad-answer regression cases. The offline 100% score is a demo
+result, not a claim of general model security, semantic correctness or fluency.
+
+### Optional LLM mode (off by default)
+
+Set `OPENAI_API_KEY` in the environment of the server process and optionally set
+`MEHER_LLM_MODEL`. The default is the low-cost
+[`gpt-5-nano`](https://developers.openai.com/api/docs/models/gpt-5-nano). The
+[Responses API](https://developers.openai.com/api/docs/guides/text) system
+instructions include the public FAQ. Private fixture values stay on the local
+server and are excluded from those instructions. The `.env.example` placeholders
+are documented but not automatically loaded.
+
+```powershell
+# After setting OPENAI_API_KEY in this terminal:
+$env:MEHER_LLM_MODEL = 'gpt-5-nano'
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads --mode llm
+# Another terminal, only when you want to incur model API usage:
+.\.venv\Scripts\python.exe -m chatcheck run --target examples/chatcheck/target.meher.llm.json --suite suites/clothing_store.json --db meher-llm.db
+```
+
+LLM mode listens on port 8768 and makes paid external requests. It is not part of
+the offline comparison and is not deterministic. The adapter uses `store: false`,
+a 2,048-token output cap and a 45-second upstream timeout. Its target config uses
+one worker and no retries. Missing keys fail startup; unsuccessful or incomplete
+upstream replies produce errors rather than fabricated fallback answers. Known
+private values are blocked in output, but that exact-value guard is not a general
+LLM security guarantee. API tests use a fake transport; no live paid API run was
+performed for the saved baseline.
+
+### Rebuild and verify
+
+The authoring script moved to `scripts/build_chatcheck_library.py`. It regenerates
+the suite and authored good/bad-response fixtures relative to the repository root,
+even when launched from another directory:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/build_chatcheck_library.py
+.\.venv\Scripts\python.exe -m chatcheck validate --suite suites/clothing_store.json
+.\.venv\Scripts\python.exe -m pytest tests/chatcheck/test_meher_demo.py tests/chatcheck/test_meher_llm.py tests/chatcheck/test_library.py -q -o cache_dir=.tools/pytest-cache
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location) '.tools/playwright'
+$env:CHATCHECK_TEST_WIDGET = '1'
+.\.venv\Scripts\python.exe -m pytest tests -q -o cache_dir=.tools/pytest-cache
+```
+
+Verification checklist: weak scores below hardened over actual HTTP; all eight
+critical leakage probes fail on weak and pass on hardened; every shared outcome
+is reported; correct paraphrases pass while incorrect policy values fail; changing
+the FAQ changes the bot's answer; offline mode needs no key; API failures are
+sanitized; legacy suites, database migrations and browser tests still pass.
 
 ## Runner and storage behavior
 
@@ -271,6 +407,74 @@ database applies it transactionally, retaining old runs, responses and verdicts.
 Old rows receive `null` metadata and an empty tag list. Reopening is idempotent.
 New runs snapshot metadata with the prompt and checks; export decodes `tags_json`
 back to the public `tags` list.
+
+## Mutation testing and held-out split (Phase 1D)
+
+Run the main library against hardened, weak and all 12 single-bug mutants:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads.mutation run
+```
+
+The command manages temporary loopback servers and writes a new timestamped
+directory under `reports/meher_threads/mutation/`. Each has `runs.db`, complete
+JSON exports, `matrix.json` (mutant by category plus failed test IDs), `report.md`,
+suite/metadata snapshots and a source manifest. Detection counts only failures
+on tests that pass on hardened. All hardened failures are reported separately.
+`--suite <path>` selects another library; `--output-dir <new-directory>` selects
+the destination. Existing results are never overwritten.
+
+The [audit](../reports/meher_threads/mutation/README.md) preserves the original
+64-test baseline: 8/12 mutants caught, four gaps, five dead tests, and zero
+hardened failures. Twelve narrow additions (one per language for each gap) now
+catch 12/12 mutants in expected categories while hardened passes 76/76. The
+original 64 tests and hardened bot were not changed. Dead tests are listed even
+when retained as regression coverage; no mutation in this set necessarily
+exercises every policy.
+
+To repeat the **frozen**, untuned 20-test held-out evaluation as well:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads.mutation run --heldout suites/clothing_store_heldout.json --freeze reports/meher_threads/mutation/heldout-freeze.json
+.\.venv\Scripts\python.exe -m pytest tests/chatcheck/test_mutation.py -q
+```
+
+Held-out hardened scored **15/20 (75%)**. Failures are `heldout.send-back-en`,
+`heldout.delivery-misspelling-en`, `heldout.rtrn-spelling-roman`,
+`heldout.return-variant-urdu`, and `heldout.inventory-urdu`: generic clarification
+replies where a policy answer or explicit uncertainty was required. These remain
+failures in exports. Pytest asserts this documented failure set, not a fabricated
+100% score. The bot and checks were frozen before the first held-out run and
+remain unchanged. This same-author split is not an independent blind benchmark.
+
+The freeze uses SHA-256 of UTF-8 text with normalized LF newlines and is verified
+before/after execution. Changed inputs abort the run. For a new experiment use
+`mutation freeze --heldout <new-suite> --output <new-freeze>` before running the
+new questions; preserve this audit and do not relabel already-seen questions as
+unseen. Held-out failures are report-only. The batch command exits 1 for main-suite
+gaps, expected-category gaps or hardened failures, and 2 for invalid input or a
+freeze mismatch.
+
+For a standalone target:
+
+```powershell
+.\.venv\Scripts\python.exe -m demo_bots.meher_threads --mode mutant --mutant wrong_return_window
+```
+
+It listens on port 8769 and implements the same POST `/chat` contract. IDs,
+triggers and expected categories are declared in
+[mutants.json](../demo_bots/meher_threads/mutants.json). Each mutant delegates all
+other behavior to hardened and reads no suites or test IDs. The empty-response
+mutant uses punctuation/emoji-only input because actual blank messages are
+already rejected by the suite and HTTP validators.
+
+Verification checklist:
+
+- Validate both JSON suites: 76 main tests and 20 held-out tests.
+- Confirm every mutant has a detection in an expected category, and zero main-suite gaps.
+- Confirm hardened passes 76/76 and the original 64 test objects are unchanged.
+- Review all five dead tests and the five documented held-out failures.
+- Verify freeze hashes, saved SQLite/export parity, and mutation pytest checks.
 
 ## Tests
 

@@ -53,9 +53,9 @@ def test_validator_reports_clear_errors_and_exit_two(tmp_path, capsys, payload, 
 def test_validate_library_from_real_cli():
     result = subprocess.run([sys.executable, "-m", "chatcheck", "validate", "--suite", "suites/clothing_store.json"], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
-    assert "Valid suite: 64 tests" in result.stdout
-    assert "groundedness: 8" in result.stdout and "robustness: 8" in result.stdout
-    assert "roman_ur: 5" in result.stdout
+    assert "Valid suite: 76 tests" in result.stdout
+    assert "groundedness: 8" in result.stdout and "robustness: 11" in result.stdout
+    assert "roman_ur: 9" in result.stdout
 
 
 def test_run_results_and_export_show_metadata(tmp_path, mock_chatbot, capsys):
