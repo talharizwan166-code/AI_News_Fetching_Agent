@@ -1,4 +1,7 @@
 import pytest
+import runpy
+from pathlib import Path
+from unittest.mock import patch
 
 import main
 
@@ -41,3 +44,32 @@ def test_invalid_configuration_exits_nonzero(monkeypatch):
     with pytest.MonkeyPatch.context() as guard:
         guard.setattr(main, "run_agent", lambda **kwargs: pytest.fail("Must not run"))
         assert main.main() == 1
+
+
+def test_tracked_environment_blocks_pipeline(monkeypatch):
+    monkeypatch.setattr(main, "check_env_not_tracked", lambda: False)
+    monkeypatch.setattr(main, "run_agent", lambda **kwargs: pytest.fail("Must not run"))
+    assert main.main() == 1
+
+
+def test_cli_tracking_guard_runs_before_loading_credentials():
+    entry_point = Path(__file__).resolve().parents[1] / "main.py"
+    with patch("src.env_safety.check_env_not_tracked", return_value=False), \
+            patch("dotenv.load_dotenv") as load, \
+            patch("src.agent.run_agent") as run:
+        with pytest.raises(SystemExit) as error:
+            runpy.run_path(str(entry_point), run_name="__main__")
+        assert error.value.code == 1
+        load.assert_not_called()
+        run.assert_not_called()
+
+
+def test_ci_guard_cannot_stop_successful_pipeline(monkeypatch):
+    from src.env_safety import check_env_not_tracked
+
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setattr(main, "check_env_not_tracked", check_env_not_tracked)
+    monkeypatch.setattr(main, "run_agent", lambda **kwargs: {"status": "success"})
+    with patch("src.env_safety.subprocess.run", side_effect=FileNotFoundError()) as git:
+        assert main.main() == 0
+    git.assert_not_called()

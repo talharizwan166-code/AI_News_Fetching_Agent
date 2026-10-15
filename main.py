@@ -13,6 +13,11 @@ import sys
 import os
 import logging
 from datetime import datetime
+from src.env_safety import check_env_not_tracked
+
+# Check before dotenv or application imports can load credentials in CLI mode.
+if __name__ == "__main__" and not check_env_not_tracked():
+    sys.exit(1)
 
 # Load .env before importing config
 from dotenv import load_dotenv
@@ -38,25 +43,6 @@ def setup_logging() -> None:
         logging.getLogger("urllib3").setLevel(logging.WARNING)
         logging.getLogger("google").setLevel(logging.WARNING)
         logging.getLogger("feedparser").setLevel(logging.WARNING)
-
-
-def check_env_not_tracked() -> bool:
-    """Check that .env is not tracked by git."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ["git", "ls-files", "--error-unmatch", ".env"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            logging.error(".env is tracked by git! This is a security risk.")
-            logging.error("Run: git rm --cached .env && echo '.env' >> .gitignore")
-            return False
-    except FileNotFoundError:
-        # git not available, skip check
-        pass
-    return True
 
 
 def check_secrets_rotation() -> None:
