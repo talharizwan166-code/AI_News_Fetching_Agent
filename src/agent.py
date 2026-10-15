@@ -8,8 +8,8 @@ from src.selector import select_best_article
 from src.generator import generate_linkedin_post
 from src.emailer import send_email
 from src.github_issues import create_approval_issue
-from src.database import init_db, save_article, migrate_db
-from src.config import MIN_QUALITY_THRESHOLD, MIN_AI_RELEVANCE
+from src.database import init_db, save_article
+from src.config import DB_PATH, MIN_QUALITY_THRESHOLD, MIN_AI_RELEVANCE
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
     if dry_run:
         logger.info("DRY RUN MODE: No email, no issue, no DB write")
 
-    init_db()
-    migrate_db()
+    if not dry_run:
+        init_db(DB_PATH)
 
     logger.info("Step 1: Fetching articles...")
     articles = fetch_all_feeds()
@@ -58,7 +58,7 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
     logger.info("After dedup: %d articles", len(articles))
 
     logger.info("Step 3: Removing already-published articles...")
-    articles = filter_published(articles)
+    articles = filter_published(articles, db_path=DB_PATH, read_only=dry_run)
     logger.info("After removing already-published: %d articles", len(articles))
 
     if not articles:
@@ -92,7 +92,6 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
         if dry_run:
             logger.info("DRY RUN: Would exit with gemini_failed status")
             return {"status": "gemini_failed", "article": best.title, "source": best.source, "error": str(exc)}
-        # In non-dry-run: send failure notification, don't create issue or save to DB
         logger.error("Gemini failure - skipping issue creation and DB save. Next run will retry.")
         return {"status": "gemini_failed", "article": best.title, "source": best.source, "error": str(exc)}
 
@@ -125,11 +124,16 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
         logger.warning("Could not create GitHub issue: %s", exc)
 
     logger.info("Step 8: Sending email...")
+    email_delivered = False
     try:
         send_email(best, linkedin_post, issue_url)
+        email_delivered = True
     except Exception as exc:
         logger.error("Failed to send email: %s", exc)
-        # Continue anyway - we still want to save to DB
+
+    if not issue_url and not email_delivered:
+        logger.error("Post was not delivered. Leaving article unpublished for retry.")
+        return {"status": "delivery_failed", "article": best.title, "source": best.source}
 
     logger.info("Step 9: Saving to database...")
     save_article(
@@ -139,6 +143,7 @@ def run_agent(dry_run: bool = False) -> dict[str, Any]:
         score=best.score,
         linkedin_post=linkedin_post,
         published_at=best.published_at,
+        db_path=DB_PATH,
     )
 
     logger.info("=== AI News Agent finished successfully ===")

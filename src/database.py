@@ -1,6 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from src.config import DB_PATH
 from src.utils import normalize_url
 
@@ -17,7 +18,15 @@ def get_connection(db_path: str = DB_PATH):
 
 
 def init_db(db_path: str = DB_PATH) -> None:
-    """Initialize database with schema and indexes."""
+    """Create or migrate the schema before creating its indexes."""
+    migrate_db(db_path)
+
+
+def migrate_db(db_path: str = DB_PATH) -> None:
+    """
+    Migrate existing database to add normalized_url column and indexes.
+    Safe to run multiple times.
+    """
     with get_connection(db_path) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS published_articles (
@@ -32,25 +41,6 @@ def init_db(db_path: str = DB_PATH) -> None:
                 created_at TEXT NOT NULL
             )
         """)
-        # Index on normalized_url for fast duplicate lookups
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_published_normalized_url
-            ON published_articles(normalized_url)
-        """)
-        # Index on source for source diversity queries
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_published_source
-            ON published_articles(source)
-        """)
-        conn.commit()
-
-
-def migrate_db(db_path: str = DB_PATH) -> None:
-    """
-    Migrate existing database to add normalized_url column and indexes.
-    Safe to run multiple times.
-    """
-    with get_connection(db_path) as conn:
         # Check if normalized_url column exists
         cols = [row[1] for row in conn.execute("PRAGMA table_info(published_articles)").fetchall()]
 
@@ -128,8 +118,21 @@ def get_published_urls(db_path: str = DB_PATH) -> set[str]:
         return {row["url"] for row in rows}
 
 
-def get_published_normalized_urls(db_path: str = DB_PATH) -> set[str]:
-    """Get all published normalized URLs for deduplication."""
+def get_published_normalized_urls(
+    db_path: str = DB_PATH, *, read_only: bool = False,
+) -> set[str]:
+    """Read history without creating or migrating a database in dry-run mode."""
+    if read_only:
+        path = Path(db_path)
+        if not path.is_file():
+            return set()
+        conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+        try:
+            # Normalize original URLs so legacy schemas need no write migration.
+            rows = conn.execute("SELECT url FROM published_articles").fetchall()
+            return {normalize_url(row[0]) for row in rows}
+        finally:
+            conn.close()
     with get_connection(db_path) as conn:
         rows = conn.execute("SELECT normalized_url FROM published_articles").fetchall()
         return {row["normalized_url"] for row in rows}

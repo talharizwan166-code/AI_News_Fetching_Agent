@@ -148,7 +148,7 @@ def main() -> int:
         if status == "success":
             logger.info("=== AI News Agent finished successfully ===")
             return 0
-        elif status in ("no_articles", "all_published", "below_threshold", "gemini_failed"):
+        elif status in ("no_articles", "all_published", "below_threshold"):
             logger.warning("Agent completed with status: %s", status)
             return 0  # Not a failure - just no actionable result
         else:

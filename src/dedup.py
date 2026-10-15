@@ -1,4 +1,5 @@
 from src.fetcher import Article
+from src.config import DB_PATH
 from src.database import get_published_normalized_urls
 from src.utils import normalize_url, normalize_title, strip_html
 
@@ -25,11 +26,13 @@ def deduplicate(articles: list[Article]) -> list[Article]:
     return unique
 
 
-def filter_published(articles: list[Article]) -> list[Article]:
+def filter_published(
+    articles: list[Article], *, db_path: str = DB_PATH, read_only: bool = False,
+) -> list[Article]:
     """
     Remove articles that have already been published (using normalized URL comparison).
     """
-    published_normalized = get_published_normalized_urls()
+    published_normalized = get_published_normalized_urls(db_path, read_only=read_only)
 
     filtered = []
     for article in articles:
