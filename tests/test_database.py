@@ -1,7 +1,9 @@
 import os
 import tempfile
+import sqlite3
 import pytest
-from src.database import init_db, save_article, is_already_published, get_published_urls
+from src.database import init_db, migrate_db, save_article, is_already_published, get_published_urls
+from src.utils import normalize_url
 
 
 @pytest.fixture
@@ -49,3 +51,20 @@ def test_get_published_urls(db_path):
     save_article("https://b.com", "B", "S2", 0.6, "P2", db_path=db_path)
     urls = get_published_urls(db_path)
     assert urls == {"https://a.com", "https://b.com"}
+
+
+@pytest.mark.parametrize("initialize", [init_db, migrate_db])
+def test_legacy_migration_preserves_history_before_index_creation(legacy_db, initialize):
+    with sqlite3.connect(legacy_db) as conn:
+        before = conn.execute("SELECT * FROM published_articles").fetchone()
+    initialize(str(legacy_db))
+    initialize(str(legacy_db))
+    with sqlite3.connect(legacy_db) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM published_articles").fetchall()
+        indexes = {row[1] for row in conn.execute("PRAGMA index_list(published_articles)")}
+    assert len(rows) == 1
+    assert tuple(rows[0])[:len(before)] == before
+    assert rows[0]["normalized_url"] == normalize_url(rows[0]["url"])
+    assert {"idx_published_normalized_url", "idx_published_source"} <= indexes
+    assert is_already_published("https://example.com/old", str(legacy_db))
