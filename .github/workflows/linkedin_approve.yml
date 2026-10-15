@@ -78,17 +78,18 @@ jobs:
             const body = context.payload.issue.body || '';
             // Parse base64-encoded marker
             const markerMatch = body.match(/<!-- POST_MARKER:([\s\S]*?)-->/);
+            let postText;
+            let articleUrl;
             if (!markerMatch) {
               // Fallback to old format
               const postMatch = body.match(/<!-- POST_START -->([\s\S]*?)<!-- POST_END -->/);
-              const postText = postMatch ? postMatch[1].trim() : '';
+              postText = postMatch ? postMatch[1].trim() : '';
               const urlMatch = body.match(/<!-- ARTICLE_URL:(.*?) -->/);
-              const articleUrl = urlMatch ? urlMatch[1].trim() : '';
+              articleUrl = urlMatch ? urlMatch[1].trim() : '';
             } else {
               const data = JSON.parse(Buffer.from(markerMatch[1], 'base64').toString());
-              const postText = data.post;
-              const articleUrl = data.url;
-              const articleTitle = data.title;
+              postText = data.post;
+              articleUrl = data.url;
             }
             const shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleUrl)}`;
 
@@ -125,6 +126,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Post to LinkedIn
+        id: post-linkedin
         if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto'
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}

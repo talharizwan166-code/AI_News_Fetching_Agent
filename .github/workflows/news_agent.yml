@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: read
 
 concurrency:
   group: news-agent-${{ github.ref }}
@@ -23,65 +24,77 @@ jobs:
       - name: Checkout main branch
         uses: actions/checkout@v4.2.2
         with:
+          ref: main
           fetch-depth: 0
 
-      - name: Check if already ran today (skip backup if primary succeeded)
-        id: already-ran
-        uses: actions/github-script@v7.0.1
-        with:
-          script: |
-            const today = new Date().toISOString().split('T')[0];
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: context.workflow,
-              per_page: 20,
-              status: 'success',
-              created: `>${today}T00:00:00Z`
-            });
-            const hasRunToday = runs.data.workflow_runs.some(r =>
-              r.conclusion === 'success' && r.created_at.startsWith(today)
-            );
-            if (hasRunToday) {
-              console.log('✅ Workflow already ran successfully today. Skipping.');
-              core.setOutput('skip', 'true');
-            } else {
-              console.log('No successful run today. Proceeding.');
-              core.setOutput('skip', 'false');
-            }
-
       - name: Set up Python
-        if: steps.already-ran.outputs.skip != 'true'
         uses: actions/setup-python@v5.4.0
         with:
           python-version: "3.12"
 
       - name: Install dependencies
-        if: steps.already-ran.outputs.skip != 'true'
         run: pip install -r requirements.txt
 
-      - name: Fetch data branch (orphan branch for DB persistence)
-        if: steps.already-ran.outputs.skip != 'true'
+      - name: Fetch and prepare data branch (inside workspace)
         run: |
-          git fetch origin data:data 2>/dev/null || echo "data branch does not exist yet"
-
-      - name: Prepare data branch directory
-        if: steps.already-ran.outputs.skip != 'true'
-        run: |
-          if git rev-parse --verify data >/dev/null 2>&1; then
-            git worktree add ../data-branch data
+          if git ls-remote --exit-code --heads origin refs/heads/data; then
+            git fetch origin refs/heads/data
+            git worktree add --detach data-branch FETCH_HEAD
           else
-            # Create orphan data branch
-            git worktree add --orphan ../data-branch data
-            cd ../data-branch
-            git rm -rf . 2>/dev/null || true
-            echo "news_agent.db" > .gitignore
-            git commit --allow-empty -m "Initialize data branch"
-            git push origin data --force
+            status=$?
+            # Exit code 2 means the branch is missing; other errors must surface.
+            if [ "$status" -ne 2 ]; then
+              exit "$status"
+            fi
+            git worktree add --orphan -b data data-branch
+            git -C data-branch config user.name "github-actions[bot]"
+            git -C data-branch config user.email "github-actions[bot]@users.noreply.github.com"
+            git -C data-branch commit --allow-empty -m "Initialize data branch"
           fi
 
+      - name: Check if already ran today (skip backup if primary succeeded)
+        id: check
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            try {
+              if (context.eventName === 'workflow_dispatch') {
+                console.log('Manual run requested. Bypassing the already-ran-today guard.');
+                core.setOutput('skip', 'false');
+                return;
+              }
+              const today = new Date().toISOString().split('T')[0];
+              // Use workflow filename, not display name
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'news_agent.yml',
+                per_page: 20,
+                status: 'success',
+                created: `>=${today}T00:00:00Z`
+              });
+              // Exclude current run
+              const currentRunId = context.runId;
+              const hasRunToday = runs.data.workflow_runs.some(r =>
+                r.id !== currentRunId &&
+                r.conclusion === 'success' &&
+                r.created_at.startsWith(today)
+              );
+              if (hasRunToday) {
+                console.log('Workflow already ran successfully today. Skipping.');
+                core.setOutput('skip', 'true');
+              } else {
+                console.log('No successful run today. Proceeding.');
+                core.setOutput('skip', 'false');
+              }
+            } catch (error) {
+              core.warning(`Could not check previous runs: ${String(error)}`);
+              console.log('Proceeding with agent run to be safe.');
+              core.setOutput('skip', 'false');
+            }
+
       - name: Run AI News Agent
-        if: steps.already-ran.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
@@ -91,19 +104,24 @@ jobs:
           EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          DB_PATH: ../data-branch/news_agent.db
+          DB_PATH: data-branch/news_agent.db
         run: python main.py
 
       - name: Commit and push DB to data branch
-        if: steps.already-ran.outputs.skip != 'true' && always()
+        if: always() && steps.check.outputs.skip != 'true'
         run: |
-          cd ../data-branch
+          # If DB doesn't exist, nothing to commit
+          if [ ! -f data-branch/news_agent.db ]; then
+            echo "No database file to commit (agent may have exited early or failed)"
+            exit 0
+          fi
+          cd data-branch
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -f news_agent.db
-          git commit --amend --no-edit --allow-empty -m "Update news_agent.db [skip ci]" || true
-          git push origin data --force
+          git commit --amend --allow-empty -m "Update news_agent.db [skip ci]"
+          git push --force origin HEAD:refs/heads/data
 
       - name: Skip notice
-        if: steps.already-ran.outputs.skip == 'true'
+        if: steps.check.outputs.skip == 'true'
         run: echo "Workflow already ran successfully today. Backup run skipped."
