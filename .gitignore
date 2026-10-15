@@ -1,6 +1,8 @@
 # Environment & secrets
 .env
 .env.local
+.env.*
+!.env.example
 
 # Database
 *.db
@@ -36,3 +38,8 @@ data-branch/
 # Coverage
 .coverage
 htmlcov/
+
+# Local review and progress artifacts
+.tools/
+workflow-changes.diff
+/PROGRESS.md
