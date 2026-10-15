@@ -174,6 +174,7 @@ def test_log_level_uses_shared_default(monkeypatch, value):
     with patch("main.logging.basicConfig") as configure:
         main.setup_logging()
     assert configure.call_args.kwargs["level"] == (logging.DEBUG if value == " debug " else logging.INFO)
+    assert configure.call_args.kwargs["force"] is True
 
 
 def test_env_helpers_do_not_load_dotenv_before_security_guard():

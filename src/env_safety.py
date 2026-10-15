@@ -6,11 +6,13 @@ from pathlib import Path
 
 from src.env import env_str
 
+logger = logging.getLogger(__name__)
+
 
 def check_env_not_tracked() -> bool:
     """Block confirmed local tracking; warn and continue in CI or on Git errors."""
     if any(env_str(name, "").lower() == "true" for name in ("CI", "GITHUB_ACTIONS")):
-        logging.warning("CI environment detected; skipping the .env tracking guard.")
+        logger.warning("CI environment detected; skipping the .env tracking guard.")
         return True
     root = Path(__file__).resolve().parents[1]
     try:
@@ -22,13 +24,13 @@ def check_env_not_tracked() -> bool:
             timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
-        logging.warning("Cannot check .env tracking: Git is unavailable or the check failed; continuing.")
+        logger.warning("Cannot check .env tracking: Git is unavailable or the check failed; continuing.")
         return True
     if result.returncode != 0:
-        logging.warning("Git could not verify .env tracking (exit %s); continuing.", result.returncode)
+        logger.warning("Git could not verify .env tracking (exit %s); continuing.", result.returncode)
         return True
     if ".env" in result.stdout.splitlines():
-        logging.error("Refusing to start: .env is tracked by Git.")
-        logging.error("Remove it with git rm --cached -- .env and rotate exposed credentials.")
+        logger.error("Refusing to start: .env is tracked by Git.")
+        logger.error("Remove it with git rm --cached -- .env and rotate exposed credentials.")
         return False
     return True

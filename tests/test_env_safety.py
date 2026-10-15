@@ -64,3 +64,4 @@ def test_ci_flags_warn_and_continue_without_git_check(flag, value, monkeypatch, 
     run.assert_not_called()
     assert "CI environment detected" in caplog.text
     assert any(record.levelno == logging.WARNING for record in caplog.records)
+    assert all(record.name == "src.env_safety" for record in caplog.records)

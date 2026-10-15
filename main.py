@@ -13,18 +13,7 @@ import sys
 import os
 import logging
 from datetime import datetime
-from src.env_safety import check_env_not_tracked
-
-# Check before dotenv or application imports can load credentials in CLI mode.
-if __name__ == "__main__" and not check_env_not_tracked():
-    sys.exit(1)
-
-# Load .env before importing config
-from dotenv import load_dotenv
-load_dotenv()
-
-from src.config import config, env_str
-from src.agent import run_agent
+from src.env import env_str
 
 
 def setup_logging() -> None:
@@ -36,6 +25,7 @@ def setup_logging() -> None:
         level=numeric_level,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        force=True,
     )
 
     # Quiet noisy third-party loggers unless DEBUG
@@ -43,6 +33,37 @@ def setup_logging() -> None:
         logging.getLogger("urllib3").setLevel(logging.WARNING)
         logging.getLogger("google").setLevel(logging.WARNING)
         logging.getLogger("feedparser").setLevel(logging.WARNING)
+
+
+# Configure CLI logging before guards, dotenv, or application imports can log.
+if __name__ == "__main__":
+    setup_logging()
+
+from src.env_safety import check_env_not_tracked
+
+# Check before dotenv or application imports can load credentials in CLI mode.
+if __name__ == "__main__" and not check_env_not_tracked():
+    sys.exit(1)
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from src.config import config
+from src.agent import run_agent
+
+
+# Runtime overrides only; the standalone LinkedIn setup utility has its own env.
+OPTIONAL_ENV_VARS = (
+    "GEMINI_MODEL", "GEMINI_FALLBACK_MODEL", "GEMINI_MAX_RETRIES",
+    "GEMINI_RETRY_WAIT_MIN", "GEMINI_RETRY_WAIT_MAX",
+    "EMAIL_SMTP_HOST", "EMAIL_SMTP_PORT",
+    "GITHUB_TOKEN", "GITHUB_REPOSITORY",
+    "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_API_VERSION",
+    "DB_PATH", "FETCH_TIMEOUT_SECONDS", "MIN_QUALITY_THRESHOLD", "MIN_AI_RELEVANCE",
+    "SCORING_WEIGHT_AI_RELEVANCE", "SCORING_WEIGHT_DEVELOPER_RELEVANCE",
+    "SCORING_WEIGHT_INNOVATION", "SCORING_WEIGHT_FRESHNESS", "SCORING_WEIGHT_SOURCE_CREDIBILITY",
+    "LOG_LEVEL", "DRY_RUN",
+)
 
 
 def check_secrets_rotation() -> None:
@@ -105,12 +126,19 @@ def main() -> int:
     if args["verbose"]:
         os.environ["LOG_LEVEL"] = "DEBUG"
 
+    # Reapply after dotenv/CLI flags, replacing any handlers installed earlier.
     setup_logging()
 
     logger = logging.getLogger(__name__)
 
     logger.info("=" * 60)
     logger.info("AI NEWS CONTENT AGENT - STARTED")
+    missing_optional = [name for name in OPTIONAL_ENV_VARS if not env_str(name, "")]
+    logger.info(
+        "Startup: git_sha=%s dry_run=%s missing_optional_vars=%s",
+        env_str("GITHUB_SHA", "unknown"), args["dry_run"],
+        ", ".join(missing_optional) or "none",
+    )
     logger.info("Run time: %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     if args["dry_run"]:
         logger.info("MODE: DRY RUN (no email, no issue, no DB write)")
