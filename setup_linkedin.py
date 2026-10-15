@@ -16,6 +16,7 @@ import webbrowser
 
 from dotenv import load_dotenv
 
+from src.env import env_str
 from src.env_safety import check_env_not_tracked
 
 
@@ -106,12 +107,12 @@ def main(argv=None) -> int:
             raise ValueError("Output already exists. Use --output .env.linkedin.new when renewing.")
         if not ignored_output(args.output):
             raise ValueError("Output must be Git-ignored. Use .env.linkedin or .env.linkedin.new.")
-        redirect_uri = args.redirect_uri or os.getenv("LINKEDIN_REDIRECT_URI") or DEFAULT_REDIRECT_URI
+        redirect_uri = args.redirect_uri or env_str("LINKEDIN_REDIRECT_URI", DEFAULT_REDIRECT_URI)
         redirect = urllib.parse.urlsplit(redirect_uri)
         if redirect.scheme not in ("http", "https") or not redirect.netloc or redirect.query or redirect.fragment:
             raise ValueError("Redirect URI must be an HTTP(S) address without a query or fragment.")
-        client_id = os.getenv("LINKEDIN_CLIENT_ID", "").strip() or input("LinkedIn Client ID: ").strip()
-        client_secret = os.getenv("LINKEDIN_CLIENT_SECRET", "").strip() or getpass.getpass("LinkedIn Client Secret (hidden): ").strip()
+        client_id = env_str("LINKEDIN_CLIENT_ID", "") or input("LinkedIn Client ID: ").strip()
+        client_secret = env_str("LINKEDIN_CLIENT_SECRET", "") or getpass.getpass("LinkedIn Client Secret (hidden): ").strip()
         if not client_id or not client_secret:
             raise ValueError("Client ID and Client Secret are required.")
 

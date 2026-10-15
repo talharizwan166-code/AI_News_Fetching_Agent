@@ -1,5 +1,7 @@
-import os
 from dotenv import load_dotenv
+
+# Re-export the shared helpers here; the pre-dotenv guard imports src.env directly.
+from src.env import ConfigError, env_str, env_int, env_float
 
 load_dotenv()
 
@@ -15,14 +17,14 @@ RSS_FEEDS = {
     "KDnuggets AI": "https://www.kdnuggets.com/feed",
 }
 
-FETCH_TIMEOUT_SECONDS = int(os.getenv("FETCH_TIMEOUT_SECONDS", "15"))
+FETCH_TIMEOUT_SECONDS = env_int("FETCH_TIMEOUT_SECONDS", 15)
 
 SCORING_WEIGHTS = {
-    "ai_relevance": 0.30,
-    "developer_relevance": 0.20,
-    "innovation": 0.20,
-    "freshness": 0.15,
-    "source_credibility": 0.15,
+    "ai_relevance": env_float("SCORING_WEIGHT_AI_RELEVANCE", 0.30),
+    "developer_relevance": env_float("SCORING_WEIGHT_DEVELOPER_RELEVANCE", 0.20),
+    "innovation": env_float("SCORING_WEIGHT_INNOVATION", 0.20),
+    "freshness": env_float("SCORING_WEIGHT_FRESHNESS", 0.15),
+    "source_credibility": env_float("SCORING_WEIGHT_SOURCE_CREDIBILITY", 0.15),
 }
 
 SOURCE_CREDIBILITY = {
@@ -37,29 +39,29 @@ SOURCE_CREDIBILITY = {
     "KDnuggets AI": 0.85,
 }
 
-MIN_QUALITY_THRESHOLD = float(os.getenv("MIN_QUALITY_THRESHOLD", "0.25"))
-MIN_AI_RELEVANCE = float(os.getenv("MIN_AI_RELEVANCE", "0.30"))
+MIN_QUALITY_THRESHOLD = env_float("MIN_QUALITY_THRESHOLD", 0.25)
+MIN_AI_RELEVANCE = env_float("MIN_AI_RELEVANCE", 0.30)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
-GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
+GEMINI_API_KEY = env_str("GEMINI_API_KEY", "")
+GEMINI_MODEL = env_str("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_FALLBACK_MODEL = env_str("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
 
-GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
-GEMINI_RETRY_WAIT_MIN = int(os.getenv("GEMINI_RETRY_WAIT_MIN", "2"))
-GEMINI_RETRY_WAIT_MAX = int(os.getenv("GEMINI_RETRY_WAIT_MAX", "30"))
+GEMINI_MAX_RETRIES = env_int("GEMINI_MAX_RETRIES", 3)
+GEMINI_RETRY_WAIT_MIN = env_int("GEMINI_RETRY_WAIT_MIN", 2)
+GEMINI_RETRY_WAIT_MAX = env_int("GEMINI_RETRY_WAIT_MAX", 30)
 
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
-EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT", "")
-EMAIL_SMTP_HOST = os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
-EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+EMAIL_SENDER = env_str("EMAIL_SENDER", "")
+EMAIL_PASSWORD = env_str("EMAIL_PASSWORD", "")
+EMAIL_RECIPIENT = env_str("EMAIL_RECIPIENT", "")
+EMAIL_SMTP_HOST = env_str("EMAIL_SMTP_HOST", "smtp.gmail.com")
+EMAIL_SMTP_PORT = env_int("EMAIL_SMTP_PORT", 587)
 
-LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
-LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN", "")
+LINKEDIN_ACCESS_TOKEN = env_str("LINKEDIN_ACCESS_TOKEN", "")
+LINKEDIN_PERSON_URN = env_str("LINKEDIN_PERSON_URN", "")
 # Verified 2026-10-15: https://learn.microsoft.com/en-us/linkedin/marketing/versioning
-LINKEDIN_API_VERSION = os.getenv("LINKEDIN_API_VERSION", "202610")
+LINKEDIN_API_VERSION = env_str("LINKEDIN_API_VERSION", "202610")
 
-DB_PATH = os.getenv("DB_PATH", "news_agent.db")
+DB_PATH = env_str("DB_PATH", "news_agent.db")
 
 
 class Config:

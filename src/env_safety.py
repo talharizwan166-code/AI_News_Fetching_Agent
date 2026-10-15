@@ -1,14 +1,15 @@
 """Check Git metadata without opening or displaying environment files."""
 
 import logging
-import os
 import subprocess
 from pathlib import Path
+
+from src.env import env_str
 
 
 def check_env_not_tracked() -> bool:
     """Block confirmed local tracking; warn and continue in CI or on Git errors."""
-    if any(os.getenv(name, "").strip().lower() == "true" for name in ("CI", "GITHUB_ACTIONS")):
+    if any(env_str(name, "").lower() == "true" for name in ("CI", "GITHUB_ACTIONS")):
         logging.warning("CI environment detected; skipping the .env tracking guard.")
         return True
     root = Path(__file__).resolve().parents[1]

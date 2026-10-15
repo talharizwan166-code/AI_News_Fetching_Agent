@@ -1,14 +1,15 @@
 import base64
 import json
 import logging
-import os
 import urllib.request
 import urllib.error
 
+from src.config import env_str
+
 logger = logging.getLogger(__name__)
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "")
+GITHUB_TOKEN = env_str("GITHUB_TOKEN", "")
+GITHUB_REPOSITORY = env_str("GITHUB_REPOSITORY", "")
 
 _API_BASE = "https://api.github.com"
 _GITHUB_TIMEOUT = 30  # seconds

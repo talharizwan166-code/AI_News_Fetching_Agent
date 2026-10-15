@@ -23,13 +23,13 @@ if __name__ == "__main__" and not check_env_not_tracked():
 from dotenv import load_dotenv
 load_dotenv()
 
-from src.config import config
+from src.config import config, env_str
 from src.agent import run_agent
 
 
 def setup_logging() -> None:
     """Configure logging from LOG_LEVEL environment variable."""
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_level = env_str("LOG_LEVEL", "INFO").upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
 
     logging.basicConfig(
@@ -92,7 +92,7 @@ def parse_args() -> dict:
     args = vars(parser.parse_args())
 
     # Also check DRY_RUN env var
-    if not args["dry_run"] and os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes"):
+    if not args["dry_run"] and env_str("DRY_RUN", "").lower() in ("1", "true", "yes"):
         args["dry_run"] = True
 
     return args
