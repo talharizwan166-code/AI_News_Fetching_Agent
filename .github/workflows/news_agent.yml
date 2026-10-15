@@ -18,7 +18,12 @@ concurrency:
 jobs:
   run-agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      GIT_TERMINAL_PROMPT: "0"
+      GIT_EDITOR: "true"
+      GIT_SEQUENCE_EDITOR: "true"
+      GCM_INTERACTIVE: "Never"
 
     steps:
       - name: Checkout main branch
@@ -26,6 +31,25 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: true
+          token: ${{ github.token }}
+
+      - name: Validate required secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+        run: |
+          missing=0
+          for name in GEMINI_API_KEY EMAIL_SENDER EMAIL_PASSWORD EMAIL_RECIPIENT; do
+            value="${!name}"
+            if [[ -z "${value//[[:space:]]/}" ]]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
 
       - name: Set up Python
         uses: actions/setup-python@v5.4.0
@@ -35,21 +59,39 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch and prepare data branch (inside workspace)
+      - name: Check data branch
+        id: data_branch
         run: |
           if git ls-remote --exit-code --heads origin refs/heads/data; then
-            git fetch origin refs/heads/data
-            git worktree add --detach data-branch FETCH_HEAD
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             status=$?
             # Exit code 2 means the branch is missing; other errors must surface.
             if [ "$status" -ne 2 ]; then
               exit "$status"
             fi
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout data branch
+        if: steps.data_branch.outputs.exists == 'true'
+        uses: actions/checkout@v4.2.2
+        with:
+          ref: data
+          path: data-branch
+          persist-credentials: true
+          token: ${{ github.token }}
+
+      - name: Prepare database (inside workspace)
+        env:
+          DATA_BRANCH_EXISTS: ${{ steps.data_branch.outputs.exists }}
+        run: |
+          if [ "$DATA_BRANCH_EXISTS" != "true" ]; then
+            # The new worktree shares main checkout's persisted HTTPS credentials.
             git worktree add --orphan -b data data-branch
             git -C data-branch config user.name "github-actions[bot]"
             git -C data-branch config user.email "github-actions[bot]@users.noreply.github.com"
-            git -C data-branch commit --allow-empty -m "Initialize data branch"
+            git -C data-branch commit --allow-empty -m "Update news_agent.db [skip ci]"
           fi
 
           python - <<'PY'
@@ -108,6 +150,7 @@ jobs:
             }
 
       - name: Run AI News Agent
+        id: agent
         if: steps.check.outputs.skip != 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -123,17 +166,27 @@ jobs:
 
       - name: Commit and push DB to data branch
         if: always() && steps.check.outputs.skip != 'true'
+        timeout-minutes: 5
+        env:
+          AGENT_OUTCOME: ${{ steps.agent.outcome }}
         run: |
-          # If DB doesn't exist, nothing to commit
+          if [ "$AGENT_OUTCOME" != "success" ]; then
+            echo "Agent did not succeed; skipping database commit and push."
+            exit 0
+          fi
           if [ ! -f data-branch/news_agent.db ]; then
-            echo "No database file to commit (agent may have exited early or failed)"
+            echo "No database file to commit; skipping database commit and push."
             exit 0
           fi
           cd data-branch
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git add -f news_agent.db
-          git commit --amend --allow-empty -m "Update news_agent.db [skip ci]"
+          if git diff --cached --quiet -- news_agent.db; then
+            echo "Database has no changes; skipping database commit and push."
+            exit 0
+          fi
+          git commit --amend --no-edit
           git push --force origin HEAD:refs/heads/data
 
       - name: Skip notice
