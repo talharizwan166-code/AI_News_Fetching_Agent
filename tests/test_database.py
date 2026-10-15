@@ -68,3 +68,30 @@ def test_legacy_migration_preserves_history_before_index_creation(legacy_db, ini
     assert rows[0]["normalized_url"] == normalize_url(rows[0]["url"])
     assert {"idx_published_normalized_url", "idx_published_source"} <= indexes
     assert is_already_published("https://example.com/old", str(legacy_db))
+
+
+def test_save_ignores_tracking_variants_of_published_article(db_path):
+    save_article("https://example.com/news/?id=1", "Keep title", "S", 0.8, "Keep post", db_path=db_path)
+    save_article("https://EXAMPLE.COM/news?id=1&utm_source=feed", "Other title", "S", 0.9, "Other post", db_path=db_path)
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute("SELECT title, linkedin_post FROM published_articles").fetchall()
+    conn.close()
+    assert rows == [("Keep title", "Keep post")]
+
+
+def test_interrupted_legacy_migration_is_repaired(legacy_db):
+    with sqlite3.connect(legacy_db) as conn:
+        conn.execute("ALTER TABLE published_articles ADD COLUMN normalized_url TEXT")
+    conn.close()
+    migrate_db(str(legacy_db))
+    assert is_already_published("https://example.com/old", str(legacy_db))
+
+
+def test_old_normalization_is_refreshed_without_losing_article(db_path):
+    save_article("https://EXAMPLE.COM/news/?id=1", "Keep title", "S", 0.8, "Keep post", db_path=db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE published_articles SET normalized_url = url")
+    conn.close()
+    migrate_db(db_path)
+    assert is_already_published("https://example.com/news?id=1", db_path)
+    assert len(get_published_urls(db_path)) == 1

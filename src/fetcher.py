@@ -1,7 +1,9 @@
 import logging
 from dataclasses import dataclass, field
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlsplit
 
 import feedparser
 import requests
@@ -24,23 +26,35 @@ class Article:
 
 def _parse_entry(entry, source: str) -> Optional[Article]:
     """Parse a single feed entry into an Article."""
+    if not isinstance(entry, Mapping):
+        return None
     link = entry.get("link", "")
     title = entry.get("title", "")
-    if not link or not title:
+    if not isinstance(link, str) or not isinstance(title, str) or not link.strip() or not title.strip():
+        return None
+    link, title = link.strip(), title.strip()
+    try:
+        parsed_link = urlsplit(link)
+        if parsed_link.scheme not in ("http", "https") or not parsed_link.netloc:
+            return None
+    except ValueError:
         return None
 
     pub_date = ""
-    if "published_parsed" in entry and entry.published_parsed:
+    published = entry.get("published_parsed") or entry.get("updated_parsed")
+    if published:
         try:
-            pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc).isoformat()
-        except (ValueError, TypeError):
+            pub_date = datetime(*published[:6], tzinfo=timezone.utc).isoformat()
+        except (ValueError, TypeError, OverflowError):
             pass
 
     summary = entry.get("summary", "") or entry.get("description", "")
+    if not isinstance(summary, str):
+        summary = ""
 
     return Article(
-        title=title.strip(),
-        url=link.strip(),
+        title=title,
+        url=link,
         source=source,
         summary=summary,
         published_at=pub_date,

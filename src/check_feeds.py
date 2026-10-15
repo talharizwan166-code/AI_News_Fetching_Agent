@@ -13,6 +13,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import feedparser
 import requests
 
 from src.config import RSS_FEEDS, FETCH_TIMEOUT_SECONDS
@@ -36,14 +37,10 @@ def check_feed(name: str, url: str, timeout: int) -> tuple[str, bool, str, float
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         if resp.status_code == 200:
-            # Quick content check - should have some XML/feed content
-            content_type = resp.headers.get("Content-Type", "").lower()
-            if any(x in content_type for x in ["xml", "rss", "atom", "feed"]):
-                return name, True, f"OK ({elapsed_ms:.0f}ms, {resp.headers.get('Content-Type', 'unknown')})", elapsed_ms
-            # Some feeds return text/html but still have valid RSS
-            if resp.content.strip().startswith(b"<?xml") or b"<rss" in resp.content[:500] or b"<feed" in resp.content[:500]:
-                return name, True, f"OK ({elapsed_ms:.0f}ms, content looks like feed)", elapsed_ms
-            return name, True, f"OK ({elapsed_ms:.0f}ms, {len(resp.content)} bytes)", elapsed_ms
+            feed = feedparser.parse(resp.content)
+            if feed.entries or (feed.version and not feed.bozo):
+                return name, True, f"OK ({elapsed_ms:.0f}ms, {len(feed.entries)} entries)", elapsed_ms
+            return name, False, f"HTTP 200 but not a usable RSS/Atom feed ({elapsed_ms:.0f}ms)", elapsed_ms
 
         return name, False, f"HTTP {resp.status_code} ({elapsed_ms:.0f}ms)", elapsed_ms
 
@@ -125,6 +122,8 @@ def main() -> int:
         help="Max concurrent workers (default: 5)",
     )
     args = parser.parse_args()
+    if args.timeout <= 0 or args.workers <= 0:
+        parser.error("--timeout and --workers must be positive")
 
     print(f"Checking {len(RSS_FEEDS)} RSS feeds (timeout={args.timeout}s)...")
     results = check_all_feeds(timeout=args.timeout, max_workers=args.workers)

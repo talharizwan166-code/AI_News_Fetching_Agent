@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+import pytest
 from src.fetcher import fetch_feed, fetch_all_feeds, Article
 
 
@@ -106,3 +107,28 @@ def test_fetch_all_feeds_aggregates():
     assert len(articles) == 2
     sources = {a.source for a in articles}
     assert sources == {"SourceA", "SourceB"}
+
+
+@pytest.mark.parametrize("bad_entry", [
+    None, "bad entry", {"title": 7, "link": "https://example.com/bad"},
+    {"title": "Bad", "link": 7}, {"title": " \t ", "link": "https://example.com/bad"},
+    {"title": "Bad", "link": "javascript:alert(1)"}, {"title": "Bad", "link": "https://[broken"},
+])
+def test_malformed_entry_does_not_discard_other_feed_articles(bad_entry):
+    feed = _mock_feed([bad_entry, {"title": "Good article", "link": "https://example.com/good"}])
+    with patch("src.fetcher.feedparser.parse", return_value=feed), \
+            patch("src.fetcher.requests.get", return_value=_mock_response(b"rss")):
+        articles = fetch_feed("Source", "https://example.com/rss")
+    assert [article.title for article in articles] == ["Good article"]
+
+
+def test_atom_updated_date_and_nontext_summary_are_handled():
+    feed = _mock_feed([{
+        "title": "Updated article", "link": "https://example.com/new", "summary": {"invalid": True},
+        "updated_parsed": (2026, 10, 15, 8, 0, 0, 3, 288, 0),
+    }])
+    with patch("src.fetcher.feedparser.parse", return_value=feed), \
+            patch("src.fetcher.requests.get", return_value=_mock_response(b"rss")):
+        article, = fetch_feed("Source", "https://example.com/rss")
+    assert article.summary == ""
+    assert article.published_at == "2026-10-15T08:00:00+00:00"

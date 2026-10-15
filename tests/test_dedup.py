@@ -54,3 +54,27 @@ def test_trailing_slash_url_dedup():
     ]
     result = deduplicate(articles)
     assert len(result) == 1
+
+
+def test_host_case_and_trailing_path_slash_with_query_are_deduplicated():
+    articles = [
+        _article(title="First", url="https://EXAMPLE.COM/news/?id=1&utm_source=feed"),
+        _article(title="Second", url="https://example.com/news?id=1"),
+    ]
+    assert len(deduplicate(articles)) == 1
+
+
+def test_distinct_non_english_titles_are_not_collapsed():
+    articles = [
+        _article(title="مصنوعی ذہانت", url="https://example.com/1"),
+        _article(title="نئی تحقیق", url="https://example.com/2"),
+    ]
+    assert len(deduplicate(articles)) == 2
+
+
+def test_encoded_html_title_matches_plain_title():
+    articles = [
+        _article(title="AI &amp; Robotics", url="https://example.com/1"),
+        _article(title="AI & Robotics", url="https://example.com/2"),
+    ]
+    assert len(deduplicate(articles)) == 1

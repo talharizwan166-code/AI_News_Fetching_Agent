@@ -91,6 +91,14 @@ def validate_config() -> bool:
         logging.error("Missing required environment variables: %s", ", ".join(missing))
         logging.error("Check your .env file. See .env.example for reference.")
         return False
+    valid = True
+    for validate in (config.validate_scoring_weights, config.validate_thresholds, config.validate_runtime):
+        is_valid, message = validate()
+        if not is_valid:
+            logging.error("Configuration validation failed: %s", message)
+            valid = False
+    if not valid:
+        return False
     logging.info("Configuration validated successfully")
     return True
 

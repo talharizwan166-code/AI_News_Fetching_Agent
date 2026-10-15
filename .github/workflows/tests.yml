@@ -4,14 +4,12 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'data/**'           # Ignore data branch
       - '*.md'              # Ignore markdown changes
       - '.gitignore'
       - 'LICENSE'
   pull_request:
     branches: [main]
     paths-ignore:
-      - 'data/**'
       - '*.md'
       - '.gitignore'
       - 'LICENSE'
@@ -34,24 +32,18 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
         run: python -m pytest tests/ -v
 
-      - name: Check code formatting (optional)
+      - name: Check all Python syntax
         run: |
           python -c "
           import ast
-          import sys
-          for f in ['main.py', 'src/agent.py', 'src/config.py', 'src/database.py', 'src/fetcher.py', 'src/scorer.py', 'src/dedup.py', 'src/selector.py', 'src/generator.py', 'src/emailer.py', 'src/linkedin_poster.py', 'src/github_issues.py', 'src/utils.py', 'src/check_feeds.py']:
-              try:
-                  with open(f) as fp:
-                      ast.parse(fp.read())
-              except SyntaxError as e:
-                  print(f'Syntax error in {f}: {e}')
-                  sys.exit(1)
+          from pathlib import Path
+          files = [*Path('.').glob('*.py'), *Path('src').rglob('*.py'), *Path('tests').rglob('*.py')]
+          for path in files:
+              ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
           print('All Python files have valid syntax')
           "

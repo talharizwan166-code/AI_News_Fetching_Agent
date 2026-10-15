@@ -8,6 +8,7 @@ from unittest.mock import patch
 import main
 
 REAL_SETUP_LOGGING = main.setup_logging
+REAL_VALIDATE_CONFIG = main.validate_config
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +55,27 @@ def test_tracked_environment_blocks_pipeline(monkeypatch):
     monkeypatch.setattr(main, "check_env_not_tracked", lambda: False)
     monkeypatch.setattr(main, "run_agent", lambda **kwargs: pytest.fail("Must not run"))
     assert main.main() == 1
+
+
+@pytest.mark.parametrize("setting, value, expected_name", [
+    ("MIN_QUALITY_THRESHOLD", 1.5, "MIN_QUALITY_THRESHOLD"),
+    ("MIN_AI_RELEVANCE", -0.1, "MIN_AI_RELEVANCE"),
+    ("SCORING_WEIGHTS", {"ai_relevance": -1, "freshness": 2}, "SCORING_WEIGHT_AI_RELEVANCE"),
+    ("SCORING_WEIGHTS", {"ai_relevance": 0.5}, "SCORING_WEIGHT_"),
+    ("FETCH_TIMEOUT_SECONDS", 0, "FETCH_TIMEOUT_SECONDS"),
+    ("EMAIL_SMTP_PORT", 70000, "EMAIL_SMTP_PORT"),
+    ("GEMINI_MAX_RETRIES", 0, "GEMINI_MAX_RETRIES"),
+    ("GEMINI_RETRY_WAIT_MIN", -1, "GEMINI_RETRY_WAIT_MIN"),
+    ("GEMINI_RETRY_WAIT_MAX", -1, "GEMINI_RETRY_WAIT_MAX"),
+])
+def test_invalid_runtime_settings_stop_before_pipeline(monkeypatch, caplog, setting, value, expected_name):
+    monkeypatch.setattr(main, "validate_config", REAL_VALIDATE_CONFIG)
+    monkeypatch.setattr(main.config, "REQUIRED_VARS", {name: "fake-value" for name in main.config.REQUIRED_VARS})
+    monkeypatch.setattr(f"src.config.{setting}", value)
+    with patch("main.run_agent") as run:
+        assert main.main() == 1
+    run.assert_not_called()
+    assert expected_name in caplog.text
 
 
 def test_cli_tracking_guard_runs_before_loading_credentials():

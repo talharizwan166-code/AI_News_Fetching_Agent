@@ -48,15 +48,15 @@ def migrate_db(db_path: str = DB_PATH) -> None:
         if "normalized_url" not in cols:
             # Add normalized_url column
             conn.execute("ALTER TABLE published_articles ADD COLUMN normalized_url TEXT")
-            # Populate normalized_url for existing rows
-            rows = conn.execute("SELECT id, url FROM published_articles").fetchall()
-            for row in rows:
-                norm_url = normalize_url(row["url"])
+        # Repair interrupted migrations and refresh history when normalization changes.
+        rows = conn.execute("SELECT id, url, normalized_url FROM published_articles").fetchall()
+        for row in rows:
+            norm_url = normalize_url(row["url"])
+            if row["normalized_url"] != norm_url:
                 conn.execute(
                     "UPDATE published_articles SET normalized_url = ? WHERE id = ?",
                     (norm_url, row["id"]),
                 )
-            conn.commit()
 
         # Create indexes if they don't exist
         conn.execute("""
@@ -96,7 +96,10 @@ def save_article(
             """
             INSERT OR IGNORE INTO published_articles
                 (url, normalized_url, title, source, score, linkedin_post, published_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE NOT EXISTS (
+                SELECT 1 FROM published_articles WHERE normalized_url = ?
+            )
             """,
             (
                 url,
@@ -107,6 +110,7 @@ def save_article(
                 linkedin_post,
                 published_at,
                 datetime.now(timezone.utc).isoformat(),
+                norm_url,
             ),
         )
         conn.commit()

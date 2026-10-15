@@ -58,6 +58,40 @@ def test_valid_required_secrets_do_not_print_credentials(tmp_path):
     assert result.stderr == ""
 
 
+@pytest.mark.parametrize("names", ["legacy", "canonical", "both"])
+def test_workflow_accepts_existing_email_secret_names_without_exposing_values(tmp_path, names):
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    aliases = {
+        "EMAIL_SENDER": "SENDER_EMAIL",
+        "EMAIL_PASSWORD": "SENDER_PASSWORD",
+        "EMAIL_RECIPIENT": "RECEIVER_EMAIL",
+    }
+    secrets = {"GEMINI_API_KEY": "fake-gemini-key"}
+    for canonical, legacy in aliases.items():
+        if names in ("canonical", "both"):
+            secrets[canonical] = "fake-canonical-secret"
+        if names in ("legacy", "both"):
+            secrets[legacy] = "fake-legacy-secret"
+    resolved_steps = []
+    for step_name in ("Validate required secrets", "Run AI News Agent"):
+        step = workflow.split(f"      - name: {step_name}\n", 1)[1].split("\n      - name:", 1)[0]
+        resolved = {"GEMINI_API_KEY": secrets["GEMINI_API_KEY"]}
+        for canonical, legacy in aliases.items():
+            match = re.search(rf"^          {canonical}: \$\{{\{{ (.*?) \}}\}}$", step, re.M)
+            assert match is not None
+            assert match.group(1) == f"secrets.{canonical} || secrets.{legacy}"
+            # Evaluate this string-only fallback against the actual repository naming scheme.
+            operands = match.group(1).split(" || ")
+            resolved[canonical] = next((secrets.get(item.removeprefix("secrets."), "") for item in operands
+                                        if secrets.get(item.removeprefix("secrets."), "")), "")
+            assert resolved[canonical] == ("fake-legacy-secret" if names == "legacy" else "fake-canonical-secret")
+        resolved_steps.append(resolved)
+    assert resolved_steps[0] == resolved_steps[1]
+    result = run_step(tmp_path, step_script("Validate required secrets"), **resolved_steps[0])
+    assert result.returncode == 0
+    assert result.stdout == result.stderr == ""
+
+
 GIT_STUB = r'''
 git() {
   printf '%s\n' "$*" >> ../git-commands.txt
@@ -117,6 +151,20 @@ def test_git_errors_fail_commit_step_instead_of_silently_succeeding(tmp_path, co
     commands = (tmp_path / "git-commands.txt").read_text().splitlines()
     if command != "push":
         assert not any(item.startswith("push ") for item in commands)
+
+
+def test_git_diff_failure_never_commits_or_pushes(tmp_path):
+    data = tmp_path / "data-branch"
+    data.mkdir()
+    (data / "news_agent.db").write_bytes(b"test database")
+    result = run_step(
+        tmp_path, GIT_STUB + step_script("Commit and push DB to data branch"),
+        AGENT_OUTCOME="success", DIFF_STATUS="128", FAIL_COMMAND="",
+    )
+    assert result.returncode == 128
+    assert "Could not check database changes" in result.stdout
+    commands = (tmp_path / "git-commands.txt").read_text().splitlines()
+    assert not any(item.startswith(("commit ", "push ")) for item in commands)
 
 
 @pytest.mark.parametrize("remote_status, expected_output, expected_code", [

@@ -111,9 +111,9 @@ See Google's [app-password instructions](https://support.google.com/accounts/ans
 ## Environment variables
 
 Blank credential fields in `.env.example` must be filled privately. The example
-contains defaults and placeholders only. Only the settings listed below are
-read; scoring-weight environment variables are not supported (weights are defined
-in `src/config.py`).
+contains defaults and placeholders only. Missing, empty, and whitespace-only
+values use defaults. Invalid numbers report the variable name without its value.
+Required credentials are reported together when missing.
 
 | Variable | Local default / purpose |
 | --- | --- |
@@ -143,6 +143,12 @@ in `src/config.py`).
 | `LOG_LEVEL` | `INFO`; use `DEBUG`, `WARNING` or `ERROR` as needed |
 | `DRY_RUN` | `0`; `1`, `true` or `yes` enables dry-run |
 
+Scoring overrides are supported through `SCORING_WEIGHT_AI_RELEVANCE` (0.30),
+`SCORING_WEIGHT_DEVELOPER_RELEVANCE` (0.20), `SCORING_WEIGHT_INNOVATION` (0.20),
+`SCORING_WEIGHT_FRESHNESS` (0.15), and `SCORING_WEIGHT_SOURCE_CREDIBILITY` (0.15).
+Each weight and relevance threshold must be between 0 and 1; weights must sum
+to 1. Timeout, port, and retry settings are also checked before agent processing.
+
 `main.py` currently validates all four required Gemini/email fields even with
 `--dry-run`. A local GitHub token is only needed if you want approval-issue
 creation; email-only delivery can still succeed. Give a local fine-grained token
@@ -155,12 +161,18 @@ Under **Settings → Secrets and variables → Actions → New repository secret
 | Secret | Purpose |
 | --- | --- |
 | `GEMINI_API_KEY` | Generate the draft |
-| `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECIPIENT` | Deliver the review email |
-| `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT` | Set these explicitly to `smtp.gmail.com` and `587` for Gmail |
+| `EMAIL_SENDER`, `EMAIL_PASSWORD`, `EMAIL_RECIPIENT` | Deliver the review email; existing aliases below are also accepted |
+| `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT` | Optional: default to `smtp.gmail.com` and `587` |
 | `LINKEDIN_ACCESS_TOKEN`, `LINKEDIN_PERSON_URN` | Optional: publish approved posts to your account |
 
-Both SMTP settings must be provided in Actions: the workflow explicitly injects
-them, so absent secrets become empty strings rather than Python defaults.
+The news workflow accepts existing repository secrets `SENDER_EMAIL`,
+`SENDER_PASSWORD`, and `RECEIVER_EMAIL` as fallbacks for `EMAIL_SENDER`,
+`EMAIL_PASSWORD`, and `EMAIL_RECIPIENT`, respectively. The canonical name wins
+when both are set. This mapping applies to both early validation and the agent
+step; no secret values are printed by validation. Local `.env` files use the
+canonical `EMAIL_*` names.
+
+Missing optional SMTP secrets arrive as empty strings and use Python defaults.
 Do not create a personal `GITHUB_TOKEN` secret for Actions. The workflow uses
 `${{ github.token }}` with `contents: write`, `issues: write` and `actions: read`.
 Repository/organization policy must permit those job permissions.
@@ -259,8 +271,10 @@ as success for the guard.
 
 Manual trigger: **Actions → AI News Agent → Run workflow → main → Run workflow**.
 Logs should show preparation, either a seed or existing-history message, agent
-processing, and a database push to `data`. The manual guard message says it is
-bypassing the already-ran-today check.
+processing, and a database push or an explicit unchanged-DB skip. The manual guard
+message says it is bypassing the already-ran-today check. Startup logs include
+`GITHUB_SHA`, the dry-run flag, and missing optional variable names. Logging is
+configured before the CI guard and uses timestamp, level, and module name.
 
 ## Approval flow
 
@@ -280,8 +294,10 @@ bypassing the already-ran-today check.
 
 Local runs use the ignored `news_agent.db`. Cloud runs use
 `data-branch/news_agent.db` inside the workspace; local and cloud DBs are separate.
-The workflow checks out application code from `main`, prepares a worktree of the
-orphan `data` branch (creating it if absent), and migrates its database.
+The workflow checks out application code from `main` and the existing `data`
+branch into `data-branch/`, retaining checkout credentials. When the branch is
+absent it creates an orphan worktree. It then migrates the database, repairing
+missing or stale normalized URLs without deleting published history.
 
 Only when the DB has zero article rows, `data/seed_published.json` seeds the three
 historical records exported from the original local DB. It contains only public
@@ -289,8 +305,12 @@ URL/title/source metadata. Import uses normalized URLs and `INSERT OR IGNORE`, s
 repeated imports do not duplicate or overwrite history. Editing this JSON does not
 reseed an already-populated cloud DB.
 
-After processing, even when the agent fails, the workflow force-adds the ignored
-DB inside that worktree, amends the data commit and force-pushes **only `data`**.
+After a successful agent step, the workflow stages the ignored DB only if present,
+checks for changes, amends the data commit without an editor, and force-pushes
+**only `data`** when there are changes. Failed/skipped agents, missing databases,
+and unchanged databases skip persistence with a message. Git diff errors fail the
+step before a commit or push. The job has a 20-minute timeout and persistence has
+a 5-minute timeout; Git terminal prompts are disabled.
 The branch is a current snapshot, not a backup archive; preserve independent
 backups if you need older states. No DB is committed to `main`, and the workflow
 never pushes application changes to `main`. A missing DB makes persistence exit
@@ -330,7 +350,8 @@ not revoke it: replace the credential and address the historical exposure.
 
 | Symptom | Check / next action |
 | --- | --- |
-| Missing configuration | Fill the four required variables. In Actions verify secret names exactly, including both SMTP settings. |
+| Missing configuration | Fill the four required variables, or use the supported legacy email secret names. SMTP host/port are optional. |
+| Empty `EMAIL_SMTP_PORT` causes an `int()` traceback | Check the run's commit SHA: current code uses `env_int` and defaults blank ports to 587. A rerun of an old workflow is not evidence that the new code ran. |
 | Gmail authentication failure | Use a fresh app password, confirm 2-Step Verification and account policy, and use port 587 with STARTTLS. |
 | Gemini 401/403/404 or quota errors | Check key restrictions, project/model access, model IDs and quota. Generation errors fail the job and leave the article available for retry. |
 | LinkedIn setup state/callback mismatch | Start a fresh authorization and paste the full redirect address. It must match the registered redirect URI. |

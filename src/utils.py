@@ -1,6 +1,7 @@
 """
 Shared utilities for URL normalization and text processing.
 """
+import html
 import re
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
@@ -13,7 +14,7 @@ _UTM_PARAMS = {
 
 
 def normalize_url(url: str) -> str:
-    """Normalize URL: strip utm_*/tracking params, fragments, lowercase, strip trailing slash."""
+    """Remove tracking/fragments and normalize host and path without changing query values."""
     if not url:
         return url
 
@@ -31,19 +32,17 @@ def normalize_url(url: str) -> str:
     new_query = urlencode(filtered, doseq=True)
     parsed = parsed._replace(query=new_query)
 
-    # Reconstruct, lowercase scheme and netloc, strip trailing slash from path
-    normalized = urlunparse(parsed)
-    normalized = normalized.rstrip("/")
-
-    return normalized
+    return urlunparse(parsed._replace(
+        scheme=parsed.scheme.lower(), netloc=parsed.netloc.lower(), path=parsed.path.rstrip("/"),
+    ))
 
 
 def normalize_title(text: str) -> str:
     """Normalize title for comparison: lowercase, strip punctuation, collapse whitespace."""
     if not text:
         return ""
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = strip_html(text).casefold().strip()
+    text = re.sub(r"[^\w\s]|_", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -57,5 +56,6 @@ def strip_html(text: str) -> str:
     if not text:
         return ""
     text = _HTML_TAG_RE.sub(" ", text)
+    text = html.unescape(text)
     text = _WHITESPACE_RE.sub(" ", text)
     return text.strip()
