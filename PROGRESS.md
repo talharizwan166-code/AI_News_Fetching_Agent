@@ -88,17 +88,21 @@
 
 ---
 
-## Phase 5: Final Verification ⏳ IN PROGRESS
+## Phase 5: Final Verification ✅ COMPLETE
 
-### To do:
-- Full pytest run
-- Dry-run test
-- `git status` and `git diff --stat`
-- Ask before commit
+### Done:
+- Full pytest run: 42/42 tests pass
+- Dry-run test: Works end-to-end (fetch→dedup→score→select→generate)
+- `git status`: Clean except for emailer.py fix
+- `git diff --stat`: 1 file changed, 1 insertion(+), 1 deletion(-)
+
+### Final change:
+- Fixed HTML entity in emailer.py: `&` → `&` for proper HTML escaping in approval button
 
 ---
 
-## Next Command to Run:
-```bash
-# Phase 5 - Full verification
-```
+## Ready to Commit
+
+All phases (1-5) complete. The only change is the single-line HTML entity fix in `src/emailer.py`. 
+
+**Shall I commit this change?**
