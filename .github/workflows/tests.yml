@@ -34,7 +34,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Install browser for chatbot widget tests
+        run: python -m playwright install --with-deps chromium
+
       - name: Run tests
+        env:
+          CHATCHECK_TEST_WIDGET: "1"
         run: python -m pytest tests/ -v
 
       - name: Check all Python syntax
@@ -42,7 +47,7 @@ jobs:
           python -c "
           import ast
           from pathlib import Path
-          files = [*Path('.').glob('*.py'), *Path('src').rglob('*.py'), *Path('tests').rglob('*.py')]
+          files = [*Path('.').glob('*.py'), *Path('src').rglob('*.py'), *Path('chatcheck').rglob('*.py'), *Path('tests').rglob('*.py')]
           for path in files:
               ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
           print('All Python files have valid syntax')

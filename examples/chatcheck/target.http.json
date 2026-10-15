@@ -1,0 +1,15 @@
+{
+  "name": "Local mock API",
+  "type": "http",
+  "url": "http://127.0.0.1:8765/chat",
+  "headers": {"Content-Type": "application/json"},
+  "request_template": {"message": "{{prompt}}"},
+  "response_json_path": "$.choices[0].message.content",
+  "runner": {
+    "concurrency": 4,
+    "timeout": 5,
+    "retries": 2,
+    "rate_limit": 10,
+    "retry_backoff": 0.1
+  }
+}

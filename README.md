@@ -1,5 +1,8 @@
 # AI News Fetching Agent
 
+This workspace also includes **Chatcheck**, the Phase 1B chatbot test engine.
+See [its setup, CLI commands, target configs and test format](docs/chatcheck.md).
+
 A Python agent that collects AI news from RSS feeds, filters and ranks articles,
 asks Gemini to draft a LinkedIn post, and delivers the draft through email and a
 GitHub approval issue. LinkedIn publishing happens only after an authorized human

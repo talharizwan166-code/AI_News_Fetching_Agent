@@ -1,0 +1,10 @@
+{
+  "name": "Local mock widget",
+  "type": "widget",
+  "url": "http://127.0.0.1:8765/",
+  "input_selector": "#message",
+  "reply_selector": ".reply[data-complete='true']",
+  "submit_selector": "#send",
+  "headless": true,
+  "runner": {"concurrency": 2, "timeout": 15, "retries": 0, "rate_limit": 2}
+}

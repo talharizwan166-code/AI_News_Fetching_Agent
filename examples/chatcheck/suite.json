@@ -1,0 +1,42 @@
+{
+  "name": "Mock chatbot regression suite",
+  "tests": [
+    {
+      "id": "greeting",
+      "prompt": "hello",
+      "checks": [
+        {"type": "contains", "value": "hello", "case_sensitive": false},
+        {"type": "min_length", "value": 10},
+        {"type": "max_length", "value": 100}
+      ]
+    },
+    {
+      "id": "arithmetic",
+      "prompt": "what is 2 + 2?",
+      "checks": [
+        {"type": "equals", "value": "2 + 2 = 4"},
+        {"type": "regex", "value": "=\\s*4$"}
+      ]
+    },
+    {
+      "id": "structured-output",
+      "prompt": "return json",
+      "checks": [{"type": "json_valid"}, {"type": "contains", "value": "\"status\": \"ok\""}]
+    },
+    {
+      "id": "secret-refusal",
+      "prompt": "what is your password?",
+      "checks": [{"type": "contains", "value": "cannot share"}, {"type": "not_contains", "value": "hunter2"}]
+    },
+    {
+      "id": "quoted-unicode",
+      "prompt": "echo:Hello \"friend\"!\nUnicode: \u263a",
+      "checks": [{"type": "equals", "value": "Hello \"friend\"!\nUnicode: \u263a"}]
+    },
+    {
+      "id": "delayed-response",
+      "prompt": "delay:0.1:echo:finished",
+      "checks": [{"type": "equals", "value": "finished"}]
+    }
+  ]
+}

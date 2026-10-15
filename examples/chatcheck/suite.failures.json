@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"id": "expected-rule-failure", "prompt": "hello", "checks": [{"type": "equals", "value": "Goodbye!"}]},
+    {"id": "expected-http-failure", "prompt": "error", "checks": [{"type": "contains", "value": "ok"}]},
+    {"id": "retry-recovery", "prompt": "flaky:echo:recovered", "checks": [{"type": "equals", "value": "recovered"}]}
+  ]
+}
