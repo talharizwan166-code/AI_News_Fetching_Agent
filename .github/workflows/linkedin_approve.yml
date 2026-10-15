@@ -131,7 +131,7 @@ jobs:
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
-          LINKEDIN_API_VERSION: "202401"
+          LINKEDIN_API_VERSION: ${{ vars.LINKEDIN_API_VERSION || '202610' }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           python -c "
@@ -164,10 +164,19 @@ jobs:
               post_to_linkedin(post_text, article_url=article_url, article_title=article_title)
               print('Posted successfully!')
           except Exception as e:
-              if '401' in str(e) or 'Unauthorized' in str(e):
+              status = getattr(e, 'status_code', getattr(e, 'code', None))
+              if status == 401:
+                  failure_type = 'token_expired'
                   print('ERROR: LinkedIn token expired or invalid (401)')
-                  sys.exit(2)  # Special exit code for token expiry
-              raise
+              elif status == 426:
+                  failure_type = 'version_sunset'
+                  print('ERROR: LinkedIn API version sunset (426); update repository variable LINKEDIN_API_VERSION')
+              else:
+                  failure_type = 'other'
+                  print('ERROR: LinkedIn publishing failed; check credentials, permissions and connectivity')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+                  output.write(f'failure_type={failure_type}\n')
+              sys.exit(1)
           "
 
       - name: Comment and close (approved)
@@ -200,20 +209,38 @@ jobs:
               state: 'closed'
             });
 
-      - name: Handle token expired
+      - name: Handle LinkedIn posting failure
         if: steps.check.outputs.action == 'approve' && steps.secrets.outputs.mode == 'auto' && failure() && steps.post-linkedin.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          FAILURE_TYPE: ${{ steps.post-linkedin.outputs.failure_type }}
         with:
           script: |
+            const failureType = process.env.FAILURE_TYPE;
+            let message;
+            if (failureType === 'token_expired') {
+              message = [
+                '**LinkedIn posting failed: access token expired or invalid (401).**',
+                'Run `python setup_linkedin.py --output .env.linkedin.new` and update the `LINKEDIN_ACCESS_TOKEN` and `LINKEDIN_PERSON_URN` GitHub Secrets.'
+              ];
+            } else if (failureType === 'version_sunset') {
+              message = [
+                '**LinkedIn posting failed: API version is no longer supported (426).**',
+                'Set repository variable `LINKEDIN_API_VERSION` under Settings → Secrets and variables → Actions → Variables to a currently supported `YYYYMM` value.',
+                'See [LinkedIn Marketing API versioning](https://learn.microsoft.com/en-us/linkedin/marketing/versioning).'
+              ];
+            } else {
+              message = [
+                '**LinkedIn posting failed.**',
+                'Check the Post to LinkedIn step logs, app permissions and connectivity. This issue remains open.'
+              ];
+            }
+            message.push('After fixing the problem, comment `approve` again to retry.');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: [
-                '**LinkedIn posting failed: Access token expired or invalid (401).**\n',
-                'Please regenerate your LinkedIn access token and update the `LINKEDIN_ACCESS_TOKEN` GitHub Secret.\n',
-                'Then comment `approve` again to retry.'
-              ].join('\n')
+              body: message.join('\n\n')
             });
 
       - name: Comment and close (rejected)

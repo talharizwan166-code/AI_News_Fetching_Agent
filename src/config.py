@@ -56,7 +56,8 @@ EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
 
 LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN", "")
 LINKEDIN_PERSON_URN = os.getenv("LINKEDIN_PERSON_URN", "")
-LINKEDIN_API_VERSION = os.getenv("LINKEDIN_API_VERSION", "202401")
+# Verified 2026-10-15: https://learn.microsoft.com/en-us/linkedin/marketing/versioning
+LINKEDIN_API_VERSION = os.getenv("LINKEDIN_API_VERSION", "202610")
 
 DB_PATH = os.getenv("DB_PATH", "news_agent.db")
 

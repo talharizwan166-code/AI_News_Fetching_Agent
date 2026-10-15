@@ -8,6 +8,14 @@ from src.config import LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN, LINKEDIN_API_
 logger = logging.getLogger(__name__)
 
 
+class LinkedInAPIError(ValueError):
+    """A publish failure with a safe message and machine-readable HTTP status."""
+
+    def __init__(self, status_code: int, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def post_to_linkedin(
     text: str,
     article_url: str = "",
@@ -57,10 +65,12 @@ def post_to_linkedin(
         with urllib.request.urlopen(req, timeout=30) as resp:
             logger.info("Posted to LinkedIn successfully (status %d)", resp.status)
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode()
-        logger.error("LinkedIn API error %d: %s", exc.code, body)
+        # Provider response bodies may contain private details; log only the status.
+        logger.error("LinkedIn API error (HTTP %d)", exc.code)
         if exc.code == 401:
-            raise ValueError(f"LinkedIn token expired or invalid (401): {body}") from exc
+            raise LinkedInAPIError(401, "LinkedIn token expired or invalid (401). Renew authorization and update the GitHub Secrets.") from exc
+        if exc.code == 426:
+            raise LinkedInAPIError(426, "LinkedIn API version is no longer supported (426). Set LINKEDIN_API_VERSION to a supported YYYYMM value.") from exc
         raise
     except urllib.error.URLError as exc:
         logger.error("LinkedIn network error: %s", exc)
