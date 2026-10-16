@@ -39,7 +39,7 @@ def test_v1_upgrade_preserves_all_history_and_is_idempotent(tmp_path):
             assert test["responses"][0]["latency_ms"] == 12.5
             assert test["verdict"]["reason"] == "original reason"
             assert result["summary"] == {"total": 1, "passed": 1, "failed": 0, "pending": 0}
-            assert [r[0] for r in db.connection.execute("SELECT version FROM chatcheck_migrations ORDER BY version")] == [1, 2]
+            assert [r[0] for r in db.connection.execute("SELECT version FROM chatcheck_migrations ORDER BY version")] == list(range(1, len(MIGRATIONS) + 1))
             assert db.connection.execute("SELECT applied_at FROM chatcheck_migrations WHERE version=1").fetchone()[0] == "2026-01-01"
             assert not db.connection.execute("PRAGMA foreign_key_check").fetchall()
 

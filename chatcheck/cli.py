@@ -12,6 +12,9 @@ from .connectors import create_connector
 from .models import CATEGORIES, LANGUAGES, SEVERITIES, RunOptions, load_suite, read_json
 from .runner import run_suite
 from .storage import Storage
+from .llm_judge import from_environment, judge_saved_run
+from .labeling import build_sample, label_items
+from .agreement import agreement_report
 
 
 def print_results(result):
@@ -24,8 +27,15 @@ def print_results(result):
         category = test.get("category") or "unspecified"
         severity = test.get("severity") or "unspecified"
         print(f"{label:7} {test['test_key']}  category={category} severity={severity}  {latency:.1f} ms  {reason}")
+        if test.get("llm_verdict"):
+            llm, combined = test["llm_verdict"], test["combined_verdict"]
+            flag = " DISAGREEMENT: human review" if combined["disagreement"] else " REVIEW" if combined["review"] else ""
+            print(f"        rule={label.lower()} llm={llm.get('verdict') or 'not judged'} hybrid={combined['verdict']}{flag}; {llm['reason']}")
     summary = result["summary"]
     print(f"{summary['passed']} passed, {summary['failed']} failed, {summary['pending']} pending / {summary['total']} tests")
+    if any(test.get("llm_verdict") for test in result["tests"]):
+        stats = result["judge_summary"]
+        print(f"Judge: {stats['calls']} calls, estimated ${stats['estimated_cost']:.6f}; {stats['disagreements']} disagreements, {stats['not_judged']} not judged")
 
 
 def print_validation(tests):
@@ -38,7 +48,7 @@ def print_validation(tests):
 
 
 def parser():
-    root = argparse.ArgumentParser(prog="chatcheck", description="Run deterministic chatbot checks and store results in SQLite.")
+    root = argparse.ArgumentParser(prog="chatcheck", description="Run chatbot checks, optional rubric judging, and blinded human review.")
     commands = root.add_subparsers(dest="command", required=True)
     validate = commands.add_parser("validate", help="Validate a JSON suite locally and report metadata counts")
     validate.add_argument("--suite", required=True)
@@ -49,11 +59,25 @@ def parser():
         run.add_argument(f"--{flag}", type=kind, default=None, help="Override target runner settings")
     results = commands.add_parser("results", help="Show stored verdicts")
     results.add_argument("--run", required=True)
+    for command in (run, results):
+        command.add_argument("--judge", choices=["off", "fake", "llm"], default="off", help="Opt in to fake or environment-configured LLM judging; default off")
     export = commands.add_parser("export", help="Export the run, attempts and verdicts as JSON")
     export.add_argument("--run", required=True)
     export.add_argument("--format", choices=["json"], required=True)
     export.add_argument("--output", help="Write UTF-8 JSON to a file instead of stdout")
-    for command in (run, results, export):
+    imports = commands.add_parser("import", help="Import a saved JSON run; never imports human labels")
+    imports.add_argument("--input", required=True)
+    sample = commands.add_parser("sample", help="Build a stratified blinded label sample from saved runs")
+    sample.add_argument("--run", action="append", help="Repeat for multiple runs; default all saved runs")
+    sample.add_argument("--size", type=int, default=100)
+    sample.add_argument("--seed", type=int, default=42)
+    label = commands.add_parser("label", help="Label raw responses without seeing judge verdicts")
+    agreement = commands.add_parser("agreement", help="Compare rule, LLM and hybrid with human labels (JSON)")
+    for command in (label, agreement):
+        selection = command.add_mutually_exclusive_group(required=True)
+        selection.add_argument("--run")
+        selection.add_argument("--sample")
+    for command in (run, results, export, imports, sample, label, agreement):
         command.add_argument("--db", default="chatcheck.db", help="SQLite path (default: chatcheck.db)")
     return root
 
@@ -82,13 +106,33 @@ def main(argv=None):
             options = RunOptions(**settings)
             tests = load_suite(args.suite)
             with Storage(args.db) as storage:
-                run_id = asyncio.run(run_suite(tests, connector, storage, options, target_name=config.get("name", config["type"]), suite_path=args.suite))
+                evaluator = from_environment(args.judge, storage)
+                run_id = asyncio.run(run_suite(tests, connector, storage, options, target_name=config.get("name", config["type"]), suite_path=args.suite, llm_judge=evaluator))
                 result = storage.results(run_id)
             print_results(result)
+            if args.judge != "off":
+                return 1 if any(t["combined_verdict"]["verdict"] != "pass" for t in result["tests"]) else 0
             return 1 if result["summary"]["failed"] else 0
-        if not Path(args.db).is_file():
+        if args.command != "import" and not Path(args.db).is_file():
             raise ValueError(f"Database not found: {args.db}")
         with Storage(args.db) as storage:
+            if args.command == "import":
+                print("Imported run: " + storage.import_run(read_json(args.input)))
+                return 0
+            if args.command == "sample":
+                sample_id, metadata = build_sample(storage, args.run, size=args.size, seed=args.seed)
+                print(f"Sample: {sample_id} ({metadata['size']} items, {len(metadata['mandatory'])} mandatory)")
+                return 0
+            if args.command in {"label", "agreement"}:
+                tests = storage.sample_tests(args.sample) if args.sample else storage.results(args.run)["tests"]
+                if args.command == "label":
+                    count = label_items(storage, tests)
+                    print(f"Saved {count} human labels. Existing labels are skipped on resume.")
+                else:
+                    print(json.dumps(agreement_report(tests), ensure_ascii=True, indent=2))
+                return 0
+            if args.command == "results" and args.judge != "off":
+                asyncio.run(judge_saved_run(storage, args.run, from_environment(args.judge, storage)))
             result = storage.results(args.run)
         if args.command == "results":
             print_results(result)

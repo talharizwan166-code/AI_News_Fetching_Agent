@@ -26,6 +26,7 @@ class RateLimiter:
 async def run_suite(
     tests: list[TestCase], connector: Connector, storage: Storage,
     options: RunOptions | None = None, *, target_name="target", suite_path="",
+    llm_judge=None,
 ) -> str:
     options = options or RunOptions()
     if not tests or len({t.id for t in tests}) != len(tests):
@@ -70,6 +71,9 @@ async def run_suite(
             async with asyncio.TaskGroup() as group:
                 for _ in range(min(options.concurrency, len(tests))):
                     group.create_task(worker())
+        if llm_judge is not None:
+            from .llm_judge import judge_saved_run
+            await judge_saved_run(storage, run_id, llm_judge)
     except BaseException as exc:
         # Commit partial results even on Ctrl+C; TaskGroup cancels other workers first.
         status = "cancelled" if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else "failed"

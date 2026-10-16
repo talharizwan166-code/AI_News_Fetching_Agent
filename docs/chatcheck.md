@@ -5,6 +5,11 @@ suite against either an HTTP chatbot API or a Playwright web widget, evaluates
 deterministic rules, and retains runs, test definitions, every response attempt,
 and final verdicts in SQLite. It does not require the news agent's credentials.
 
+Phase 2A adds opt-in Gemini/OpenAI rubric judging, persistent call/cost budgets,
+blinded human labels, stratified sampling and agreement reports. See
+[judging and human review](chatcheck-judging.md) for exact offline and capped
+real-provider commands. Existing rule checks remain enabled; judging defaults off.
+
 ## Quick start
 
 From the repository root, activate the virtual environment and install the engine:

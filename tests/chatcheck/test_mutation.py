@@ -11,14 +11,23 @@ from chatcheck.storage import Storage
 from demo_bots.meher_threads.bot import StoreBot
 from demo_bots.meher_threads.knowledge import DEFAULT_FAQ, DEFAULT_PRIVATE, ROOT
 from demo_bots.meher_threads.mutants import METADATA_PATH, MutantBot, mutant_metadata
-from demo_bots.meher_threads.mutation import evaluate, freeze, summarize, verify_freeze
+from demo_bots.meher_threads.mutation import evaluate, fingerprints, freeze, summarize, verify_freeze
 
 
 @pytest.fixture(scope="module")
 def mutation_run(tmp_path_factory):
-    output = tmp_path_factory.mktemp("mutation") / "results"
+    directory = tmp_path_factory.mktemp("mutation")
+    output = directory / "results"
+    # Phase 2A changes orchestration/storage. Preserve the historical audit and
+    # require all original bot, suite and deterministic-judge inputs to match it.
+    historical = read_json(ROOT / "reports/meher_threads/mutation/heldout-freeze.json")["files"]
+    current = fingerprints(ROOT / "suites/clothing_store.json", ROOT / "suites/clothing_store_heldout.json")
+    orchestration = {"chatcheck/cli.py", "chatcheck/runner.py", "chatcheck/storage.py"}
+    assert all(current[path] == checksum for path, checksum in historical.items() if path not in orchestration)
+    lock = directory / "phase2a-freeze.json"
+    freeze(lock, ROOT / "suites/clothing_store.json", ROOT / "suites/clothing_store_heldout.json")
     result = evaluate(output, heldout=ROOT / "suites/clothing_store_heldout.json",
-                      freeze_path=ROOT / "reports/meher_threads/mutation/heldout-freeze.json")
+                      freeze_path=lock)
     return result, output
 
 
@@ -143,7 +152,7 @@ def test_heldout_results_match_documented_failures_without_tuning(mutation_run):
     assert {t.prompt for t in heldout}.isdisjoint(t.prompt for t in main)
     assert {t.language for t in heldout} == {"en", "ur", "roman_ur"}
     assert {t.category for t in heldout} == set(CATEGORIES)
-    verify_freeze(ROOT / "reports/meher_threads/mutation/heldout-freeze.json",
+    verify_freeze(output / "heldout-freeze.json",
                   ROOT / "suites/clothing_store.json", ROOT / "suites/clothing_store_heldout.json")
 
 

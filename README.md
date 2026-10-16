@@ -3,6 +3,8 @@
 This workspace also includes **Chatcheck**, a chatbot test engine with a 76-test
 clothing-store library, deterministic demo targets, and 12 single-bug mutants.
 See [its setup, CLI commands, target configs and test format](docs/chatcheck.md).
+The [Phase 2A guide](docs/chatcheck-judging.md) covers opt-in Gemini/OpenAI
+judging, blinded labeling, stratified sampling and agreement metrics.
 The [mutation audit](reports/meher_threads/mutation/README.md) records original
 coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
 

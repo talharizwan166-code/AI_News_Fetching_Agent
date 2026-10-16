@@ -1,0 +1,179 @@
+{
+  "total": 100,
+  "labeled": 0,
+  "human_unsure": 0,
+  "definite_labels": 0,
+  "positive_class": "fail",
+  "overall": {
+    "rule_only": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    },
+    "llm_only": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    },
+    "hybrid": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    }
+  },
+  "common_subset": {
+    "rule_only": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    },
+    "llm_only": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    },
+    "hybrid": {
+      "n": 0,
+      "judged": 0,
+      "abstained": 0,
+      "coverage": null,
+      "accuracy": null,
+      "accuracy_with_abstentions_wrong": null,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "kappa": null,
+      "confusion_matrix": {
+        "pass": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        },
+        "fail": {
+          "pass": 0,
+          "fail": 0,
+          "uncertain": 0,
+          "not_judged": 0
+        }
+      }
+    }
+  },
+  "per_category": {},
+  "per_language": {},
+  "disagreements": [],
+  "notes": "Accuracy, precision, recall, F1 and kappa use definite predictions and definite human labels. See coverage and common_subset for fair comparisons. Undefined metrics are null. This stratified review sample does not estimate population accuracy.",
+  "judge_provenance": [
+    {
+      "provider": "fake",
+      "model": "offline-v1",
+      "rubric_version": "2a.1",
+      "items": 100
+    }
+  ]
+}

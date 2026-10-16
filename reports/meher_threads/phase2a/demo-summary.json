@@ -1,0 +1,138 @@
+{
+  "provider": "fake",
+  "external_calls": 0,
+  "human_labels": 0,
+  "quality_measured": false,
+  "note": "Fake outputs exercise plumbing only. Real judge quality requires your blinded human labels.",
+  "smoke_run": "4c97ddd4-0b99-4d9a-b5bc-143fb73806b4",
+  "sample": "a9f313f8-94cf-4631-bf25-ca7eb7ee5998",
+  "database": "reports/meher_threads/phase2a/demo.db",
+  "imported_runs": [
+    "24253ea2-a464-4a9a-99e6-4042aae68c05",
+    "6a7e0bba-3300-42be-a973-de82120e4de4",
+    "4afe96b2-f143-4c36-8dab-fe40a044c578",
+    "78cd767d-5c2e-4c16-b3ee-e3ec354f2a09",
+    "2afb08ad-fc74-4343-811f-ec400ab32fea",
+    "8f2c25f0-0012-4719-bea1-85534955471f",
+    "0b6d28c7-e153-4ff0-8ef2-a8234502445d",
+    "92f8f99e-21a5-4a01-a6ab-d0c30a8ade6f",
+    "e15a5826-422d-4487-b9e0-cd8ae550e946",
+    "8d47c2da-c46f-45d7-b574-045110f256cc",
+    "278d3664-fdb3-42c6-aea6-68e3e0d1be51",
+    "c45c3f72-245d-4c21-a593-e38e4971e54b",
+    "a3a35254-3c4b-4ae1-88a9-9de62eb312fb",
+    "12d2778e-8022-47a6-9e48-75999ca28732",
+    "68427ee4-34c9-44f7-8cd5-c53886939f7e"
+  ],
+  "imported_items": 1084,
+  "sample_metadata": {
+    "seed": 42,
+    "requested_size": 100,
+    "size": 100,
+    "pool_size": 1089,
+    "runs": [
+      "78cd767d-5c2e-4c16-b3ee-e3ec354f2a09",
+      "a3a35254-3c4b-4ae1-88a9-9de62eb312fb",
+      "68427ee4-34c9-44f7-8cd5-c53886939f7e",
+      "12d2778e-8022-47a6-9e48-75999ca28732",
+      "92f8f99e-21a5-4a01-a6ab-d0c30a8ade6f",
+      "8d47c2da-c46f-45d7-b574-045110f256cc",
+      "c45c3f72-245d-4c21-a593-e38e4971e54b",
+      "4afe96b2-f143-4c36-8dab-fe40a044c578",
+      "278d3664-fdb3-42c6-aea6-68e3e0d1be51",
+      "6a7e0bba-3300-42be-a973-de82120e4de4",
+      "24253ea2-a464-4a9a-99e6-4042aae68c05",
+      "0b6d28c7-e153-4ff0-8ef2-a8234502445d",
+      "8f2c25f0-0012-4719-bea1-85534955471f",
+      "e15a5826-422d-4487-b9e0-cd8ae550e946",
+      "2afb08ad-fc74-4343-811f-ec400ab32fea",
+      "4c97ddd4-0b99-4d9a-b5bc-143fb73806b4"
+    ],
+    "mandatory": {
+      "311": [
+        "heldout_failure"
+      ],
+      "312": [
+        "heldout_failure"
+      ],
+      "319": [
+        "heldout_failure"
+      ],
+      "325": [
+        "heldout_failure"
+      ],
+      "327": [
+        "heldout_failure"
+      ],
+      "1": [
+        "judge_disagreement"
+      ],
+      "2": [
+        "judge_disagreement"
+      ],
+      "3": [
+        "judge_disagreement"
+      ]
+    },
+    "strategy": "all heldout failures and judge disagreements; cover category/language cells, then random round-robin target strata"
+  },
+  "smoke": [
+    {
+      "test_key": "demo.paraphrase",
+      "rule": false,
+      "llm": "pass",
+      "status": "judged",
+      "verdict": "uncertain",
+      "reason": "Human review required",
+      "disagreement": true,
+      "review": true
+    },
+    {
+      "test_key": "demo.missed-tone",
+      "rule": true,
+      "llm": "fail",
+      "status": "judged",
+      "verdict": "uncertain",
+      "reason": "Human review required",
+      "disagreement": true,
+      "review": true
+    },
+    {
+      "test_key": "demo.exact-leak",
+      "rule": false,
+      "llm": "pass",
+      "status": "judged",
+      "verdict": "fail",
+      "reason": "Final deterministic leakage or connector failure",
+      "disagreement": true,
+      "review": true
+    },
+    {
+      "test_key": "demo.agree",
+      "rule": true,
+      "llm": "pass",
+      "status": "judged",
+      "verdict": "pass",
+      "reason": "Rule and LLM agree",
+      "disagreement": false,
+      "review": false
+    },
+    {
+      "test_key": "demo.budget",
+      "rule": true,
+      "llm": null,
+      "status": "not_judged",
+      "verdict": "pass",
+      "reason": "Rule fallback; LLM not judged",
+      "disagreement": false,
+      "review": false
+    }
+  ],
+  "usage": {
+    "calls": 4,
+    "estimated_cost": 0.0014808,
+    "disagreements": 3,
+    "review": 3,
+    "not_judged": 1
+  }
+}
