@@ -1,0 +1,37 @@
+{
+  "database": "reports/meher_threads/samples/runs.db",
+  "external_calls": 0,
+  "source": "reports/meher_threads/mutation/final",
+  "score_basis": "hybrid with rule fallback; imported rule-only runs",
+  "human_labels": 0,
+  "reports": {
+    "weak": {
+      "run_id": "a3a35254-3c4b-4ae1-88a9-9de62eb312fb",
+      "html": "reports/meher_threads/samples/weak.html",
+      "score": {
+        "total": 76,
+        "passed": 15,
+        "failed": 61,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 19.7,
+        "display": "19.7%",
+        "bar_width": "19.7"
+      }
+    },
+    "hardened": {
+      "run_id": "78cd767d-5c2e-4c16-b3ee-e3ec354f2a09",
+      "html": "reports/meher_threads/samples/hardened.html",
+      "score": {
+        "total": 76,
+        "passed": 76,
+        "failed": 0,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 100.0,
+        "display": "100.0%",
+        "bar_width": "100.0"
+      }
+    }
+  }
+}

@@ -1,0 +1,156 @@
+{% from 'sections.html' import score_table, key_list %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="generator" content="Chatcheck client report">
+  <title>{{ client }} · {{ target }} · Chatcheck report</title>
+  <style>{% include 'styles.css' %}</style>
+</head>
+<body>
+<main>
+  <header class="cover" id="cover">
+    <p class="eyebrow">CHATCHECK / BEHAVIOR EVALUATION</p>
+    <h1>Chatbot evaluation report</h1>
+    <p class="client" dir="auto">{{ client }}</p>
+    <div class="cover-grid">
+      <dl>
+        <dt>Target</dt><dd dir="auto">{{ target }}</dd>
+        <dt>Run date</dt><dd>{{ run_date }}</dd>
+        <dt>Run ID</dt><dd class="identifier">{{ run_id }}</dd>
+        <dt>Suite</dt><dd dir="auto">{{ suite_name }}</dd>
+        <dt>Suite version</dt><dd dir="auto">{{ suite_version }}</dd>
+        <dt>Run status</dt><dd>{{ status }}</dd>
+      </dl>
+      <div class="score-card">
+        <span class="score-label">Overall test pass score</span>
+        <strong>{{ overall.display }}</strong>
+        <span>{{ overall.passed }} / {{ overall.total }} tests passed</span>
+        <span class="score-footnote">Hybrid verdicts with rule fallback</span>
+      </div>
+    </div>
+    <p class="metadata">Generated {{ generated_at }} · {{ suite_note }}</p>
+  </header>
+
+  <section id="executive-summary">
+    <p class="eyebrow">01 / THE RESULT</p>
+    <h2>Executive summary</h2>
+    <div class="summary">{% for sentence in summary %}<p>{{ sentence }}</p>{% endfor %}</div>
+    <p class="note">The score is passed tests divided by all tests in this saved run. Failures, uncertain results and pending tests receive no pass credit. It is not a probability of safety.</p>
+  </section>
+
+  <section id="scores">
+    <p class="eyebrow">02 / COVERAGE AND PERFORMANCE</p>
+    <h2>Scores by category</h2>
+    {{ score_table(categories, 'Category') }}
+    <h2>Scores by language</h2>
+    {{ score_table(languages, 'Language') }}
+    <p class="note">en = English · ur = Urdu script · roman_ur = Roman Urdu. Bars show test pass scores; uncertainty and pending work remain visible in the tables.</p>
+  </section>
+
+  {% if comparison %}
+  <section id="comparison">
+    <p class="eyebrow">03 / CHANGE FROM BASELINE</p>
+    <h2>Before / after comparison</h2>
+    <p>Baseline: <bdi>{{ comparison.target }}</bdi> · {{ comparison.run_id }} · {{ comparison.date }}</p>
+    <table>
+      <thead><tr><th>Basis</th><th>Before</th><th>After</th><th>Change (percentage points)</th></tr></thead>
+      <tbody>
+        <tr><th>Whole run</th><td>{{ comparison.before.display }}</td><td>{{ comparison.after.display }}</td><td>{% if comparison.delta is not none %}{{ '%+.1f'|format(comparison.delta) }}{% else %}Not available{% endif %}</td></tr>
+        <tr><th>{{ comparison.matched }} identical matched tests</th><td>{{ comparison.matched_before.display }}</td><td>{{ comparison.matched_after.display }}</td><td>{% if comparison.matched_delta is not none %}{{ '%+.1f'|format(comparison.matched_delta) }}{% else %}Not available{% endif %}</td></tr>
+      </tbody>
+    </table>
+    {% for warning in comparison.warnings %}<p class="note">{{ warning }}</p>{% endfor %}
+    <div class="comparison-lists">
+      {{ key_list('Tests fixed', comparison.fixed) }}
+      {{ key_list('Newly failing tests', comparison.newly_failing) }}
+    </div>
+    {{ key_list('Other verdict changes (including uncertainty or pending work)', comparison.review_changes) }}
+    {{ key_list('Changed test definitions — excluded from direct comparison', comparison.modified) }}
+    {{ key_list('Added tests', comparison.added) }}
+    {{ key_list('Removed tests', comparison.removed) }}
+  </section>
+  {% endif %}
+
+  <section id="top-issues">
+    <p class="eyebrow">PRIORITIES / WHAT TO ADDRESS</p>
+    <h2>Top {{ issues|length }} issues</h2>
+    <p class="note">Failure groups are ranked by severity, then number of affected tests. Each group shows its highest-severity example; one test can appear in multiple check groups. Uncertain results are listed separately for review.</p>
+    {% for issue in issues %}
+    <article class="issue">
+      <div class="issue-heading"><span class="severity severity-{{ issue.severity }}">{{ issue.severity }}</span><h3>{{ loop.index }}. {{ issue.category|replace('_', ' ') }} / {{ issue.check_type }}</h3></div>
+      <p class="metadata">{{ issue.frequency }} affected test{% if issue.frequency != 1 %}s{% endif %} · Example: <bdi>{{ issue.test_key }}</bdi></p>
+      <h4>Exact prompt</h4>
+      <pre class="evidence" dir="{{ issue.prompt_dir }}" lang="{{ 'ur' if issue.prompt_dir == 'rtl' else 'ur-Latn' if issue.language == 'roman_ur' else 'en' }}">{{ issue.prompt }}</pre>
+      <h4>Response{% if issue.truncated %} (truncated){% endif %}</h4>
+      <pre class="evidence" dir="{{ issue.response_dir }}" lang="{{ 'ur' if issue.response_dir == 'rtl' else 'ur-Latn' if issue.language == 'roman_ur' else 'en' }}">{{ issue.response }}</pre>
+      <h4>Expected behavior</h4><p dir="auto">{{ issue.expected }}</p>
+      <h4>Saved check result</h4><p class="reason" dir="auto">{{ issue.reason }}</p>
+      <div class="recommendation"><h4>Why it matters</h4><p>{{ issue.why }}</p><h4>Recommended fix</h4><p>{{ issue.fix }}</p></div>
+    </article>
+    {% else %}<p>No failing issue groups were recorded. Review uncertain and pending results before drawing conclusions.</p>{% endfor %}
+    <p class="note">Recommendations: reviewed static fixes catalog {{ catalog_version }}. {{ catalog_note }}</p>
+  </section>
+
+  {% if disagreements %}
+  <section id="disagreements">
+    <p class="eyebrow">REVIEW / WHERE JUDGES DIFFER</p>
+    <h2>Rule and LLM disagreements</h2>
+    <p>{{ disagreements|length }} definite disagreements are recorded. A critical exact-leak failure remains final even when the LLM says pass.</p>
+    {% for item in disagreements %}
+    <article class="disagreement">
+      <h3 dir="auto">{{ item.test_key }}</h3>
+      <p>Rule: <strong>{{ item.rule }}</strong> · LLM: <strong>{{ item.llm }}</strong> · Hybrid: <strong>{{ item.hybrid }}</strong></p>
+      <p class="reason" dir="auto">Rule reason: {{ item.rule_reason }}</p>
+      <p dir="auto">LLM reason: {{ item.llm_reason }}</p>
+      <p dir="auto">Evidence quote: {{ item.evidence }}</p>
+    </article>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section id="scope-and-limits">
+    <p class="eyebrow">INTERPRETATION / SCOPE AND LIMITS</p>
+    <h2>Scope and limits</h2>
+    <p>This report covers {{ overall.total }} saved tests across {{ categories|length }} category labels and {{ languages|length }} language labels. Run status: {{ status }}.</p>
+    <p>Categories: {% for row in categories %}{{ row.name }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+    <p>Languages: {% for row in languages %}{{ row.name }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+    {% if missing_categories %}<p>Engine categories not represented: {{ missing_categories|join(', ') }}.</p>{% endif %}
+    {% if missing_languages %}<p>Engine languages not represented: {{ missing_languages|join(', ') }}.</p>{% endif %}
+    <h3>What was not tested</h3>
+    <ul>{% for item in not_tested %}<li>{{ item }}</li>{% endfor %}</ul>
+    <h3>Judges and human review</h3>
+    <p>Deterministic rule checks are retained for every evaluated test. The score uses saved hybrid verdicts with rule fallback; human labels do not override these verdicts. {{ review_count }} items carry a human-review flag.</p>
+    {% if agreement.judge_provenance %}
+    <p>{{ llm_judged }} / {{ overall.total }} tests have a completed LLM or fake-provider evaluation. Recorded judge provenance:</p>
+    <ul>{% for judge in agreement.judge_provenance %}<li>{{ judge.provider }} / {{ judge.model }} / rubric {{ judge.rubric_version }} ({{ judge.items }} items with stored judge records).</li>{% endfor %}</ul>
+    <p class="note">A fake provider exercises the workflow and does not measure semantic quality. Stored judge records may include unjudged errors or budget exhaustion.</p>
+    {% else %}<p>Judge used: deterministic rules only. No LLM judge records are present.</p>{% endif %}
+    {% if agreement.labeled %}
+    <p>Human labels exist for {{ agreement.labeled }} / {{ overall.total }} tests: {{ agreement.definite_labels }} definite and {{ agreement.human_unsure }} unsure. Agreement below uses definite labels and definite predictions; failure is the positive class.</p>
+    <table id="human-agreement"><thead><tr><th>Judge</th><th>Covered / definite labels</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>Cohen's kappa</th></tr></thead><tbody>
+    {% for name, result in agreement.overall.items() %}<tr><th>{{ name|replace('_', ' ') }}</th><td>{{ result.judged }} / {{ result.n }}</td>{% for key in ['accuracy', 'precision', 'recall', 'f1', 'kappa'] %}<td>{% if result[key] is not none %}{{ '%.3f'|format(result[key]) }}{% else %}Not available{% endif %}</td>{% endfor %}</tr>{% endfor %}
+    </tbody></table>
+    <p class="note">Abstentions reduce coverage; scores on different covered subsets are not directly comparable. {{ agreement.common_subset.rule_only.n }} labels have definite predictions from all three judges. These reviewed labels may be selected rather than representative; agreement does not estimate population accuracy.</p>
+    {% else %}<p>No human labels exist. Measured agreement with human decisions is not available.</p>{% endif %}
+    <h3>Evidence handling</h3>
+    <p>Prompts and responses are escaped text. Synthetic canaries and configured secret-like patterns are replaced with [REDACTED] throughout this report. Prompts are otherwise untruncated; response excerpts are limited to {{ response_limit }} characters after redaction. Pattern matching does not guarantee detection of every secret or encoded value.</p>
+    <p class="metadata">Saved test-definition fingerprint: {{ snapshot }}</p>
+    <p class="limit-statement">These results do not prove a chatbot is completely safe.</p>
+  </section>
+
+  <section id="appendix">
+    <p class="eyebrow">APPENDIX / EVERY SAVED TEST</p>
+    <h2>Full pass/fail appendix</h2>
+    <p class="note">Every saved test appears below, including uncertain and pending outcomes. Not judged means the LLM produced no valid recorded verdict; it does not imply a pass.</p>
+    <table class="appendix-table">
+      <thead><tr><th>Test / check reason</th><th>Category / language</th><th>Severity</th><th>Rule</th><th>LLM</th><th>Hybrid</th><th>Human</th></tr></thead>
+      <tbody>{% for item in appendix %}<tr><td><bdi>{{ item.test_key }}</bdi><div class="reason" dir="auto">{{ item.reason }}</div><details><summary>Prompt and response</summary><h4>Exact prompt</h4><pre class="evidence" dir="{{ item.prompt_dir }}" lang="{{ 'ur' if item.prompt_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.prompt }}</pre><h4>Response excerpt</h4><pre class="evidence" dir="{{ item.response_dir }}" lang="{{ 'ur' if item.response_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.response }}</pre></details></td><td>{{ item.category }}<br>{{ item.language }}</td><td>{{ item.severity }}</td><td>{{ item.rule }}</td><td>{{ item.llm }}</td><td><strong>{{ item.hybrid }}</strong></td><td>{{ item.human }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </section>
+  <footer>Chatcheck · {{ client }} · {{ run_id }}</footer>
+</main>
+</body>
+</html>

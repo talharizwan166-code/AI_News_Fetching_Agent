@@ -1,0 +1,39 @@
+@page { size: A4; margin: 17mm 14mm; @bottom-right { content: counter(page); font-size: 9pt; color: #64748b; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: #edf2f5; color: #172b40; font: 15px/1.65 "Segoe UI", Arial, "Noto Nastaliq Urdu", "Noto Naskh Arabic", "Nirmala UI", sans-serif; }
+main { max-width: 1080px; margin: 36px auto; background: #fff; box-shadow: 0 10px 45px #102b4014; }
+.cover { padding: 42px 48px 30px; background: #112d42; color: #f8fafc; border-top: 8px solid #2dd4bf; }
+.eyebrow { margin: 0 0 8px; color: #0f766e; font-weight: 700; font-size: 11px; letter-spacing: 1.6px; }
+.cover .eyebrow { color: #76e5d3; }
+h1 { margin: 0; font-size: 36px; line-height: 1.2; letter-spacing: -1px; }
+.client { font-size: 23px; margin: 12px 0 24px; }
+.cover-grid { display: flex; gap: 30px; align-items: center; }
+dl { display: grid; grid-template-columns: 105px 1fr; gap: 4px 15px; margin: 0; flex: 1; font-size: 13px; }
+dt { color: #bbd4e2; } dd { margin: 0; overflow-wrap: anywhere; }
+.identifier { font-size: 12px; }
+.score-card { width: 240px; flex-shrink: 0; background: #214357; padding: 22px; border-radius: 8px; }
+.score-card span { display: block; } .score-card strong { display: block; font-size: 46px; line-height: 1.4; }
+.score-label { color: #c1f7eb; font-size: 12px; } .score-footnote { font-size: 11px; margin-top: 12px; }
+.metadata { font-size: 11px; opacity: .8; overflow-wrap: anywhere; }
+section { padding: 28px 48px; border-bottom: 1px solid #e2e8f0; }
+h2 { font-size: 23px; margin: 0 0 15px; line-height: 1.4; } h3 { font-size: 17px; margin: 20px 0 8px; } h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 6px; color: #3c5267; }
+p { margin: 8px 0; } .summary p { margin: 9px 0; } .note { font-size: 12px; color: #52667a; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; margin: 12px 0 22px; }
+th, td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+thead th { background: #f1f5f9; font-weight: 600; color: #334d62; } tbody th { font-weight: 500; }
+.score-table th:first-child { width: 24%; } .score-table th:last-child { width: 22%; } .bar-score { display: inline-block; min-width: 46px; margin-right: 6px; } svg { vertical-align: middle; max-width: 100%; }
+.issue { padding: 18px 0 25px; border-bottom: 1px solid #dbe5eb; }
+.issue-heading { display: flex; align-items: center; gap: 12px; } .issue-heading h3 { margin: 0; }
+.severity { text-transform: uppercase; font-size: 10px; letter-spacing: .7px; font-weight: 700; border-radius: 4px; padding: 3px 8px; background: #e2e8f0; }
+.severity-critical { background: #fee2e2; color: #991b1b; } .severity-high { background: #ffedd5; color: #9a3412; } .severity-medium { background: #fef3c7; color: #92400e; } .severity-low { background: #dbeafe; color: #1e40af; }
+pre.evidence { margin: 6px 0 14px; background: #f5f8fa; border: 1px solid #dbe5eb; border-radius: 4px; padding: 12px 15px; font: inherit; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; unicode-bidi: plaintext; }
+[dir="rtl"], [lang="ur"] { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", "Urdu Typesetting", "Nirmala UI", "Segoe UI", serif; line-height: 2.3; text-align: right; }
+.reason { font-size: 11px; color: #52667a; white-space: pre-wrap; overflow-wrap: anywhere; }
+.recommendation { padding: 2px 16px 12px; background: #effaf7; border-left: 3px solid #0f766e; margin-top: 18px; }
+.comparison-lists { display: flex; gap: 25px; } .comparison-lists > div { flex: 1; } .change-list { overflow-wrap: anywhere; }
+.disagreement { border-left: 3px solid #eab308; padding: 0 16px; margin: 18px 0; }
+.limit-statement { font-weight: 700; padding: 15px 18px; background: #f1f5f9; border-left: 3px solid #334d62; margin-top: 20px; }
+.appendix-table { font-size: 10px; } .appendix-table th:first-child { width: 35%; } .appendix-table th:nth-child(2) { width: 17%; } .appendix-table .reason { font-size: 9px; margin-top: 6px; }
+footer { padding: 24px 48px; font-size: 11px; color: #64748b; overflow-wrap: anywhere; }
+@media (max-width: 700px) { main { margin: 0; } section, .cover { padding: 24px 18px; } .cover-grid, .comparison-lists { display: block; } .score-card { margin-top: 20px; width: 100%; } h1 { font-size: 29px; } th, td { padding: 6px 4px; } table { font-size: 10px; } }
+@media print { body { background: white; font-size: 10pt; } main { margin: 0; width: 100%; box-shadow: none; } section, .cover { padding: 18pt 0; } .cover { padding: 22pt; } h2, h3, h4 { break-after: avoid; } thead { display: table-header-group; } tr { break-inside: avoid; } pre.evidence { orphans: 3; widows: 3; } .score-card { width: 180px; } .score-card strong { font-size: 32pt; } footer { padding: 15pt 0; } }

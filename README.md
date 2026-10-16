@@ -5,6 +5,9 @@ clothing-store library, deterministic demo targets, and 12 single-bug mutants.
 See [its setup, CLI commands, target configs and test format](docs/chatcheck.md).
 The [Phase 2A guide](docs/chatcheck-judging.md) covers opt-in Gemini/OpenAI
 judging, blinded labeling, stratified sampling and agreement metrics.
+The [Phase 2B reporting guide](docs/chatcheck-reports.md) covers client HTML/PDF
+reports, redaction and before/after comparisons; [sample reports](reports/meher_threads/samples/README.md)
+show the weak and hardened demo targets.
 The [mutation audit](reports/meher_threads/mutation/README.md) records original
 coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
 

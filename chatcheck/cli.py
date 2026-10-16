@@ -73,11 +73,22 @@ def parser():
     sample.add_argument("--seed", type=int, default=42)
     label = commands.add_parser("label", help="Label raw responses without seeing judge verdicts")
     agreement = commands.add_parser("agreement", help="Compare rule, LLM and hybrid with human labels (JSON)")
+    report = commands.add_parser("report", help="Generate a self-contained client HTML report from a saved run")
+    report.add_argument("--run", required=True)
+    report.add_argument("--out", required=True, help="New .html output file")
+    report.add_argument("--pdf", action="store_true", help="Also create a sibling PDF when WeasyPrint is available")
+    report.add_argument("--compare", help="Baseline run ID in the same database")
+    report.add_argument("--client", default="Client not specified")
+    report.add_argument("--suite-name", help="Explicit display name; does not change saved tests")
+    report.add_argument("--suite-version", help="Explicit display version; otherwise use saved test-definition hash")
+    report.add_argument("--not-tested", action="append", default=[], help="Add a scope exclusion; repeat as needed")
+    report.add_argument("--redact-pattern", action="append", default=[], help="Additional secret regex; repeat as needed")
+    report.add_argument("--response-limit", type=int, default=2000, help="Maximum response excerpt characters after redaction")
     for command in (label, agreement):
         selection = command.add_mutually_exclusive_group(required=True)
         selection.add_argument("--run")
         selection.add_argument("--sample")
-    for command in (run, results, export, imports, sample, label, agreement):
+    for command in (run, results, export, imports, sample, label, agreement, report):
         command.add_argument("--db", default="chatcheck.db", help="SQLite path (default: chatcheck.db)")
     return root
 
@@ -116,6 +127,14 @@ def main(argv=None):
         if args.command != "import" and not Path(args.db).is_file():
             raise ValueError(f"Database not found: {args.db}")
         with Storage(args.db) as storage:
+            if args.command == "report":
+                from .report import Redactor, write_report
+                run = storage.results(args.run)
+                comparison = storage.results(args.compare) if args.compare else None
+                print(write_report(run, args.out, pdf=args.pdf, client=args.client, compare=comparison,
+                                   suite_name=args.suite_name, suite_version=args.suite_version, not_tested=args.not_tested,
+                                   redactor=Redactor.from_environment(args.redact_pattern), response_limit=args.response_limit))
+                return 0
             if args.command == "import":
                 print("Imported run: " + storage.import_run(read_json(args.input)))
                 return 0

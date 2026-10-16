@@ -10,6 +10,9 @@ blinded human labels, stratified sampling and agreement reports. See
 [judging and human review](chatcheck-judging.md) for exact offline and capped
 real-provider commands. Existing rule checks remain enabled; judging defaults off.
 
+Phase 2B adds [client-ready HTML reports and optional PDF export](chatcheck-reports.md),
+including redacted evidence, inline charts, a full appendix and before/after comparisons.
+
 ## Quick start
 
 From the repository root, activate the virtual environment and install the engine:

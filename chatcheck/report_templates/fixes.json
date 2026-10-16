@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "reviewed": true,
+  "review_note": "Static guidance reviewed against the engine categories and check semantics. This is not a client-specific audit or a claim of human approval.",
+  "fixes": {
+    "groundedness": {
+      "*": {"why": "Unsupported facts can mislead customers about stock, prices or product claims.", "fix": "Ground answers in approved store data, state when information is unavailable and offer a support route. Review rejected paraphrases before changing the bot or tightening checks."}
+    },
+    "prompt_injection": {
+      "*": {"why": "Customer instructions may override intended support behavior or expose internal information.", "fix": "Keep trusted instructions separate from customer and retrieved text. Refuse override requests and rerun the exact attack plus paraphrased variants."},
+      "not_contains": {"why": "An exact forbidden marker or instruction appeared in a response.", "fix": "Remove private material from the model context where possible, enforce instruction boundaries and add an output guard for known sensitive markers. Recheck the saved attack and related variants."}
+    },
+    "data_leakage": {
+      "*": {"why": "Private information in a public response can expose customers or internal operations.", "fix": "Minimize private context, enforce authorization outside the model and test refusals without quoting sensitive values."},
+      "not_contains": {"why": "The response contains a forbidden value; an otherwise polite refusal can still leak it.", "fix": "Remove unnecessary secrets from context, enforce access controls and redact sensitive output before delivery. Retest the exact disclosure attempt and multilingual variants."}
+    },
+    "scope": {
+      "*": {"why": "Unrelated answers may misrepresent the service and distract from support needs.", "fix": "Define supported tasks explicitly and offer a brief store-support redirect for unrelated requests. Test indirect and multilingual requests."}
+    },
+    "policy_accuracy": {
+      "*": {"why": "Incorrect policy wording can create false expectations about returns, payments or delivery.", "fix": "Retrieve policy conditions from one approved source. Preserve amounts, timelines and exceptions, and review correct paraphrases that a text check rejects."}
+    },
+    "language": {
+      "*": {"why": "The wrong language or script can make support inaccessible to the customer.", "fix": "Track the requested language and distinguish Urdu script from Roman Urdu. Verify with native-language review and retain valid borrowed product terms."}
+    },
+    "tone": {
+      "*": {"why": "Dismissive or hostile replies can damage customer trust, especially during complaints.", "fix": "Use respectful acknowledgment and a practical next step. Review real complaint paraphrases and confirm that wording checks accept natural, polite alternatives."}
+    },
+    "robustness": {
+      "*": {"why": "Ambiguous or malformed input may leave customers without a useful next step.", "fix": "Handle empty, long and unclear input explicitly, ask a focused clarification and preserve relevant instructions within accepted input limits."}
+    },
+    "*": {
+      "*": {"why": "The saved behavior did not meet the selected test criteria.", "fix": "Review the exact prompt, response and expected behavior, correct the underlying behavior or a demonstrably brittle check, and rerun the affected tests."},
+      "json_valid": {"why": "Invalid JSON can break integrations that consume structured responses.", "fix": "Use schema-constrained output and validate it before returning it to the caller; test malformed and adversarial requests."},
+      "connector_error": {"why": "The target did not return a successful response, so behavior could not be evaluated reliably.", "fix": "Check target availability, authentication, response selection and timeout settings, then rerun the failed requests."},
+      "llm_subjective": {"why": "The rubric judge flagged a behavioral concern that needs review in context.", "fix": "Have a human compare the response with the expected behavior and evidence quote, then update the behavior and regression examples as justified."}
+    }
+  }
+}

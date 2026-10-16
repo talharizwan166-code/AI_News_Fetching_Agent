@@ -1,0 +1,3 @@
+# Optional PDF export. Windows also needs the native Pango libraries; see docs.
+-r requirements-chatcheck.txt
+WeasyPrint>=68,<71
