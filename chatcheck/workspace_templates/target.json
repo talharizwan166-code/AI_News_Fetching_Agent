@@ -1,0 +1,9 @@
+{
+  "name": "Client chatbot",
+  "type": "http",
+  "url": "https://your-chatbot.example/chat",
+  "headers": {"Authorization": "Bearer ${CHATBOT_API_KEY}"},
+  "request_template": {"message": "{{prompt}}"},
+  "response_json_path": "$.reply",
+  "runner": {"concurrency": 2, "timeout": 30, "retries": 1}
+}

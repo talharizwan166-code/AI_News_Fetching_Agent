@@ -1,0 +1,35 @@
+{
+  "command": [
+    "C:\\Users\\Talha rizwan\\Desktop\\agent project\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "python": "3.12.15 (main, Oct  9 2026, 15:21:55) [MSC v.1944 64 bit (AMD64)]",
+  "started_at": "2026-10-16T06:29:56.692552+00:00",
+  "source_sha256": "5a449818ba385e660190aa254e15d6a66df98e76f45a8b890b7ee3b38de709f0",
+  "runs": [
+    {
+      "index": 1,
+      "exit_code": 0,
+      "summary": "588 passed, 2 skipped in 83.67s (0:01:23)",
+      "log": "pytest-1.txt"
+    },
+    {
+      "index": 2,
+      "exit_code": 0,
+      "summary": "588 passed, 2 skipped in 90.84s (0:01:30)",
+      "log": "pytest-2.txt"
+    },
+    {
+      "index": 3,
+      "exit_code": 0,
+      "summary": "588 passed, 2 skipped in 88.69s (0:01:28)",
+      "log": "pytest-3.txt"
+    }
+  ],
+  "source_unchanged": true,
+  "all_passed": true
+}

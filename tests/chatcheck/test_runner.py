@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from chatcheck.connectors import Connector, create_connector
+from chatcheck.connectors import Connector, ConnectorError, create_connector
 from chatcheck.models import RunOptions, TestCase as Case, load_suite
-from chatcheck.runner import run_suite
+from chatcheck.runner import RateLimiter, run_suite
 from chatcheck.storage import Storage
 
 
@@ -64,13 +64,36 @@ def test_concurrency_is_bounded_and_requests_overlap(tmp_path, mock_chatbot):
     assert mock_chatbot.max_active_requests == 2
 
 
-def test_rate_limit_is_shared_across_workers_and_retries(tmp_path, mock_chatbot):
-    tests = [case(str(i), f"flaky:echo:{i}", str(i)) for i in range(3)]
-    result = execute(tmp_path, mock_chatbot, tests, RunOptions(concurrency=3, rate_limit=8, retries=1, retry_backoff=0))
-    assert result["summary"]["passed"] == 3
-    starts = sorted(event["time"] for event in mock_chatbot.events)
-    assert len(starts) == 6
-    assert all(b - a >= 0.10 for a, b in zip(starts, starts[1:]))
+def test_rate_limit_is_shared_across_workers_and_retries(tmp_path):
+    # Server arrival times include OS scheduling and HTTP buffering. Exercise
+    # request admission directly with a virtual clock, including concurrent retries.
+    class Clock:
+        now = 0.0
+
+        async def sleep(self, duration):
+            self.now += duration
+            await asyncio.sleep(0)
+
+    clock = Clock()
+    starts, attempts = [], {}
+
+    class Flaky(Connector):
+        async def send(self, prompt):
+            starts.append(clock.now)
+            attempts[prompt] = attempts.get(prompt, 0) + 1
+            attempt = attempts[prompt]
+            await asyncio.sleep(0)
+            if attempt == 1:
+                raise ConnectorError("Transient fixture", retryable=True)
+            return prompt
+
+    with Storage(tmp_path / "rate.db") as db:
+        limiter = RateLimiter(8, clock=lambda: clock.now, sleep=clock.sleep)
+        run_id = asyncio.run(run_suite([case(str(i), str(i), str(i)) for i in range(3)], Flaky(), db,
+                            RunOptions(concurrency=3, rate_limit=8, retries=1, retry_backoff=0), rate_limiter=limiter))
+        assert db.results(run_id)["summary"]["passed"] == 3
+    assert starts == pytest.approx([i / 8 for i in range(6)])
+    assert attempts == {"0": 2, "1": 2, "2": 2}
 
 
 @pytest.mark.parametrize("path", ["$.missing", "$.choices[*]", "$"])

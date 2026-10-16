@@ -76,7 +76,7 @@ def parser():
     report = commands.add_parser("report", help="Generate a self-contained client HTML report from a saved run")
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True, help="New .html output file")
-    report.add_argument("--pdf", action="store_true", help="Also create a sibling PDF when WeasyPrint is available")
+    report.add_argument("--pdf", action="store_true", help="Also create a sibling PDF using Chromium, with optional WeasyPrint fallback")
     report.add_argument("--compare", help="Baseline run ID in the same database")
     report.add_argument("--client", default="Client not specified")
     report.add_argument("--suite-name", help="Explicit display name; does not change saved tests")
@@ -84,11 +84,18 @@ def parser():
     report.add_argument("--not-tested", action="append", default=[], help="Add a scope exclusion; repeat as needed")
     report.add_argument("--redact-pattern", action="append", default=[], help="Additional secret regex; repeat as needed")
     report.add_argument("--response-limit", type=int, default=2000, help="Maximum response excerpt characters after redaction")
+    init = commands.add_parser("init", help="Create starter workspace files without overwriting existing files")
+    init.add_argument("directory", nargs="?", default=".")
+    purge = commands.add_parser("purge", help="Delete saved run data and dependent records; requires --yes")
+    selection = purge.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--run")
+    selection.add_argument("--older-than", type=float, help="Delete finished runs started more than DAYS ago")
+    purge.add_argument("--yes", action="store_true", help="Confirm deletion of the selected run data")
     for command in (label, agreement):
         selection = command.add_mutually_exclusive_group(required=True)
         selection.add_argument("--run")
         selection.add_argument("--sample")
-    for command in (run, results, export, imports, sample, label, agreement, report):
+    for command in (run, results, export, imports, sample, label, agreement, report, purge):
         command.add_argument("--db", default="chatcheck.db", help="SQLite path (default: chatcheck.db)")
     return root
 
@@ -100,6 +107,15 @@ def main(argv=None):
             stream.reconfigure(errors="backslashreplace")
     args = parser().parse_args(argv)
     try:
+        if args.command == "init":
+            from .workspace import init_workspace
+            result = init_workspace(args.directory)
+            print(f"Workspace: {result['directory']}")
+            print("Created: " + (", ".join(result["created"]) or "none"))
+            print("Skipped existing: " + (", ".join(result["skipped"]) or "none"))
+            return 0
+        if args.command == "purge" and not args.yes:
+            raise ValueError("Purge requires --yes; no run data was deleted")
         if args.command == "validate":
             print_validation(load_suite(args.suite))
             return 0
@@ -127,6 +143,13 @@ def main(argv=None):
         if args.command != "import" and not Path(args.db).is_file():
             raise ValueError(f"Database not found: {args.db}")
         with Storage(args.db) as storage:
+            if args.command == "purge":
+                result = storage.purge(run_id=args.run, older_than=args.older_than, confirmed=args.yes)
+                print("Deleted records:")
+                for table, count in result["deleted"].items():
+                    print(f"  {table}: {count}")
+                print(f"Samples updated: {result['samples_updated']}")
+                return 0
             if args.command == "report":
                 from .report import Redactor, write_report
                 run = storage.results(args.run)

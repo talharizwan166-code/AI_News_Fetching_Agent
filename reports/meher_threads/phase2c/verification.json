@@ -1,0 +1,15 @@
+{
+  "suite_runs": [
+    "588 passed, 2 skipped in 83.67s (0:01:23)",
+    "588 passed, 2 skipped in 90.84s (0:01:30)",
+    "588 passed, 2 skipped in 88.69s (0:01:28)"
+  ],
+  "source_unchanged": true,
+  "pdf": "reports/meher_threads/phase2c/hardened.pdf",
+  "pdf_pages": 9,
+  "renderer": "Playwright Chromium",
+  "editable_console_verified": true,
+  "wheel_resources_test": "passed in all three full suite runs",
+  "purge_tests": "passed; no existing client run was purged",
+  "external_provider_calls": 0
+}

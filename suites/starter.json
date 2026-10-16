@@ -1,0 +1,6 @@
+{
+  "name": "Client chatbot acceptance suite",
+  "version": "1.0",
+  "description": "Add tests before validating or running. Start with reviewed cases from the bundled clothing-store library, adapted to the client's actual behavior.",
+  "tests": []
+}

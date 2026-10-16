@@ -255,7 +255,7 @@ class LLMJudge:
         key = digest([RUBRIC_VERSION, self.provider.cache_namespace, system, record, SCHEMA, self.config.max_output_tokens])
         base["cache_key"] = key
         async with self.lock:
-            cached = self.storage.get_judge_cache(key)
+            cached = self.storage.get_judge_cache(key, run_id=run_id)
             if cached is not None:
                 try:
                     parsed = parse_verdict(json.dumps(cached), response)
@@ -273,7 +273,7 @@ class LLMJudge:
                     async with asyncio.timeout(self.config.timeout):
                         raw = await self.provider.complete(system, data, max_output_tokens=self.config.max_output_tokens)
                     parsed = parse_verdict(raw, response)
-                    self.storage.put_judge_cache(key, parsed)
+                    self.storage.put_judge_cache(key, parsed, run_id=run_id)
                     return {**base, **parsed, "status": "judged"}
                 except (ProviderError, TimeoutError) as exc:
                     transient = isinstance(exc, TimeoutError) or exc.transient

@@ -1,5 +1,10 @@
 # First chatbot test library
 
+The installed package bundles this library as `chatcheck.suites`.
+[`starter.json`](starter.json) is the intentionally empty template copied to
+`suite.json` by `chatcheck init`. Add reviewed test cases before validating or
+running it; empty suites are deliberately rejected by the engine.
+
 [`clothing_store.json`](clothing_store.json) contains **76 tests**: the original
 64 unchanged (eight each for
 groundedness, prompt injection, data leakage, scope, policy accuracy, language,

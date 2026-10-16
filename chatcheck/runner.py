@@ -10,23 +10,26 @@ from .storage import Storage
 
 
 class RateLimiter:
-    def __init__(self, requests_per_second: float):
+    def __init__(self, requests_per_second: float, *, clock=None, sleep=None):
         self.interval = 1 / requests_per_second if requests_per_second else 0
         self.next_start = 0.0
         self.lock = asyncio.Lock()
+        self.clock = clock or time.monotonic
+        self.sleep = sleep or asyncio.sleep
 
     async def wait(self):
         if not self.interval:
             return
         async with self.lock:
-            await asyncio.sleep(max(0, self.next_start - time.monotonic()))
-            self.next_start = time.monotonic() + self.interval
+            await self.sleep(max(0, self.next_start - self.clock()))
+            self.next_start = self.clock() + self.interval
 
 
 async def run_suite(
     tests: list[TestCase], connector: Connector, storage: Storage,
     options: RunOptions | None = None, *, target_name="target", suite_path="",
     llm_judge=None,
+    rate_limiter=None,
 ) -> str:
     options = options or RunOptions()
     if not tests or len({t.id for t in tests}) != len(tests):
@@ -34,7 +37,7 @@ async def run_suite(
     for test in tests:
         validate_checks(test.checks)
     run_id, test_ids = storage.start_run(tests, target_name, suite_path, options)
-    limiter = RateLimiter(options.rate_limit)
+    limiter = rate_limiter if rate_limiter is not None else RateLimiter(options.rate_limit)
     work = iter(zip(tests, test_ids))
 
     async def worker():

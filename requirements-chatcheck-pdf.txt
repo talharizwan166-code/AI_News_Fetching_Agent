@@ -1,3 +1,4 @@
-# Optional PDF export. Windows also needs the native Pango libraries; see docs.
+# Optional WeasyPrint fallback; the core Playwright Chromium path is the default.
+# Windows also needs native Pango libraries for WeasyPrint; see docs.
 -r requirements-chatcheck.txt
 WeasyPrint>=68,<71

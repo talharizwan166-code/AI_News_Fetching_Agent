@@ -8,6 +8,8 @@ judging, blinded labeling, stratified sampling and agreement metrics.
 The [Phase 2B reporting guide](docs/chatcheck-reports.md) covers client HTML/PDF
 reports, redaction and before/after comparisons; [sample reports](reports/meher_threads/samples/README.md)
 show the weak and hardened demo targets.
+The [operations guide](docs/chatcheck-operations.md) covers editable/wheel installation,
+Chromium PDF export, `chatcheck init`, and confirmed deletion with `chatcheck purge`.
 The [mutation audit](reports/meher_threads/mutation/README.md) records original
 coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
 

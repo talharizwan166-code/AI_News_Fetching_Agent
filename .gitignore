@@ -45,3 +45,7 @@ workflow-changes.diff
 /PROGRESS.md
 
 *.db
+
+dist/
+build/
+*.egg-info/

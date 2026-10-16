@@ -1,9 +1,10 @@
 """SQLite persistence; ordered, transactional schema migrations."""
 
 import json
+import math
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -29,6 +30,11 @@ MIGRATIONS = (
         "CREATE TABLE human_labels (test_id INTEGER PRIMARY KEY REFERENCES tests(id) ON DELETE CASCADE, label TEXT NOT NULL CHECK(label IN ('pass', 'fail', 'unsure')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
         "CREATE TABLE label_samples (id TEXT PRIMARY KEY, metadata_json TEXT NOT NULL, created_at TEXT NOT NULL)",
         "CREATE TABLE label_sample_items (sample_id TEXT NOT NULL REFERENCES label_samples(id) ON DELETE CASCADE, test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE, position INTEGER NOT NULL, PRIMARY KEY(sample_id, test_id), UNIQUE(sample_id, position))",
+    ),
+    (
+        "CREATE TABLE judge_cache_runs (run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE, cache_key TEXT NOT NULL REFERENCES llm_cache(cache_key) ON DELETE CASCADE, PRIMARY KEY(run_id, cache_key))",
+        "CREATE INDEX judge_cache_runs_key ON judge_cache_runs(cache_key)",
+        "INSERT OR IGNORE INTO judge_cache_runs SELECT t.run_id, c.cache_key FROM llm_verdicts l JOIN tests t ON t.id=l.test_id JOIN llm_cache c ON c.cache_key=json_extract(l.result_json, '$.cache_key')",
     ),
 )
 
@@ -146,13 +152,18 @@ class Storage:
                 (test_id, json.dumps(result), json.dumps(combined), now()),
             )
 
-    def get_judge_cache(self, key):
+    def get_judge_cache(self, key, *, run_id=None):
         row = self.connection.execute("SELECT result_json FROM llm_cache WHERE cache_key=?", (key,)).fetchone()
+        if row and run_id is not None:
+            with self.connection:
+                self.connection.execute("INSERT OR IGNORE INTO judge_cache_runs VALUES (?, ?)", (run_id, key))
         return json.loads(row[0]) if row else None
 
-    def put_judge_cache(self, key, result):
+    def put_judge_cache(self, key, result, *, run_id=None):
         with self.connection:
-            self.connection.execute("INSERT OR REPLACE INTO llm_cache VALUES (?, ?, ?)", (key, json.dumps(result), now()))
+            self.connection.execute("INSERT INTO llm_cache VALUES (?, ?, ?) ON CONFLICT(cache_key) DO UPDATE SET result_json=excluded.result_json, created_at=excluded.created_at", (key, json.dumps(result), now()))
+            if run_id is not None:
+                self.connection.execute("INSERT OR IGNORE INTO judge_cache_runs VALUES (?, ?)", (run_id, key))
 
     def judge_usage(self, run_id):
         row = self.connection.execute("SELECT COUNT(*), COALESCE(SUM(estimated_cost), 0) FROM judge_calls WHERE run_id=?", (run_id,)).fetchone()
@@ -182,6 +193,69 @@ class Storage:
 
     def list_runs(self):
         return [dict(row) for row in self.connection.execute("SELECT id, target_name, suite_path, status FROM runs ORDER BY started_at, id")]
+
+    def purge(self, *, run_id=None, older_than=None, confirmed=False, clock=None):
+        """Delete selected run data transactionally, including cache/sample references.
+
+        Files outside this database and provider-side logs are not affected.
+        """
+        if confirmed is not True:
+            raise ValueError("Purge requires --yes; no run data was deleted")
+        if (run_id is None) == (older_than is None):
+            raise ValueError("Select exactly one of --run or --older-than")
+        if older_than is not None and (type(older_than) not in (int, float) or not math.isfinite(older_than) or older_than < 0):
+            raise ValueError("older-than must be a finite nonnegative number of days")
+        tables = ("runs", "tests", "responses", "verdicts", "llm_verdicts", "human_labels",
+                  "judge_calls", "judge_cache_runs", "llm_cache", "label_sample_items", "label_samples")
+        self.connection.execute("PRAGMA secure_delete = ON")
+        with self.connection:
+            self.connection.execute("BEGIN IMMEDIATE")
+            if run_id is not None:
+                selected = [row[0] for row in self.connection.execute("SELECT id FROM runs WHERE id=?", (run_id,))]
+                if not selected:
+                    raise ValueError(f"Run not found: {run_id}")
+            else:
+                try:
+                    cutoff = ((clock or (lambda: datetime.now(timezone.utc)))() - timedelta(days=older_than)).isoformat()
+                except OverflowError:
+                    raise ValueError("older-than exceeds the supported date range") from None
+                selected = [row[0] for row in self.connection.execute(
+                    "SELECT id FROM runs WHERE status != 'running' AND julianday(started_at) < julianday(?) ORDER BY id", (cutoff,))]
+            before = {table: self.connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
+            if selected:
+                selected_set = set(selected)
+                test_ids = set()
+                for key in selected:
+                    test_ids.update(str(row[0]) for row in self.connection.execute("SELECT id FROM tests WHERE run_id=?", (key,)))
+                # Samples store source IDs in JSON as well as FK-linked members.
+                # Keep other runs' members and labels; scrub only deleted sources.
+                affected = []
+                for row in self.connection.execute("SELECT id, metadata_json FROM label_samples"):
+                    metadata = json.loads(row["metadata_json"])
+                    members = {str(r[0]) for r in self.connection.execute("SELECT test_id FROM label_sample_items WHERE sample_id=?", (row["id"],))}
+                    if members & test_ids or selected_set & set(metadata.get("runs", [])):
+                        affected.append((row["id"], metadata))
+                self.connection.executemany("DELETE FROM runs WHERE id=?", [(key,) for key in selected])
+                # Live owners protect shared entries; unowned legacy cache entries
+                # cannot be attributed safely and are discarded too.
+                self.connection.execute("DELETE FROM llm_cache WHERE NOT EXISTS (SELECT 1 FROM judge_cache_runs r WHERE r.cache_key=llm_cache.cache_key)")
+                updated = 0
+                for sample_id, metadata in affected:
+                    remaining = self.connection.execute("SELECT COUNT(*) FROM label_sample_items WHERE sample_id=?", (sample_id,)).fetchone()[0]
+                    if not remaining:
+                        self.connection.execute("DELETE FROM label_samples WHERE id=?", (sample_id,))
+                        continue
+                    metadata["runs"] = [key for key in metadata.get("runs", []) if key not in selected_set]
+                    metadata["mandatory"] = {key: value for key, value in metadata.get("mandatory", {}).items() if key not in test_ids}
+                    metadata["size"] = remaining
+                    metadata["pool_size"] = sum(self.connection.execute(
+                        "SELECT COUNT(*) FROM tests t JOIN verdicts v ON v.test_id=t.id WHERE t.run_id=?", (key,)).fetchone()[0] for key in metadata["runs"])
+                    self.connection.execute("UPDATE label_samples SET metadata_json=? WHERE id=?", (json.dumps(metadata), sample_id))
+                    updated += 1
+            else:
+                updated = 0
+            counts = {table: before[table] - self.connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
+        return {"deleted": counts, "samples_updated": updated}
 
     def save_sample(self, test_ids, metadata):
         sample_id = str(uuid.uuid4())

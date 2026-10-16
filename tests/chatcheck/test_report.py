@@ -13,7 +13,7 @@ from chatcheck.llm_judge import hybrid_verdict
 from chatcheck.models import CATEGORIES, RunOptions, TestCase as Case
 from chatcheck.report import (
     Redactor, build_context, compare_runs, deny_resource, load_catalog,
-    pdf_bytes, render_report, scores, suite_snapshot, write_report,
+    weasyprint_pdf_bytes, render_report, scores, suite_snapshot, write_report,
 )
 from chatcheck.storage import Storage
 
@@ -300,7 +300,7 @@ def test_pdf_resource_loading_denied_for_network_and_local_files(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "weasyprint", SimpleNamespace(HTML=HTML))
     monkeypatch.setitem(sys.modules, "weasyprint.urls", SimpleNamespace(URLFetcher=Fetcher))
-    assert pdf_bytes("<p>safe</p>") == b"%PDF-safe"
+    assert weasyprint_pdf_bytes("<p>safe</p>") == b"%PDF-safe"
     with pytest.raises(ValueError):
         deny_resource("file:///private")
 

@@ -2,7 +2,9 @@
 
 Generate a standalone UTF-8 HTML report from a saved SQLite run. No chatbot,
 LLM, labeling action or external asset request is needed. Jinja2 is included in
-the core Chatcheck requirements; PDF export is a separate optional installation.
+the core Chatcheck requirements. PDF export now defaults to the locally installed
+Playwright Chromium; WeasyPrint remains an optional fallback. See the
+[Phase 2C operations guide](chatcheck-operations.md) for packaging and data retention.
 
 ## Quick start
 
@@ -161,23 +163,31 @@ Install Noto Nastaliq Urdu locally for the intended typography; no font download
 occurs while opening or exporting a report. Available system fonts determine the
 final glyph appearance.
 
-Install optional PDF support separately:
+PDF export uses Chromium from the core Playwright dependency. This repository's
+matching `.tools/playwright` browser installation is reused automatically unless
+`PLAYWRIGHT_BROWSERS_PATH` explicitly selects another location. On a new machine:
 
 ```powershell
-python -m pip install -r requirements-chatcheck-pdf.txt
+python -m playwright install chromium
 python -m chatcheck report --run <id> --out report-with-pdf.html --pdf
 ```
 
-This writes HTML and a sibling `report-with-pdf.pdf`. If WeasyPrint or its native
-dependencies are missing, HTML is retained and a clear installation message is
-printed; this successful HTML generation exits 0. On Windows, WeasyPrint also
-needs native libraries including Pango; follow its
+This writes HTML and a sibling `report-with-pdf.pdf`: A4, print backgrounds,
+defined margins and page numbers. Chromium runs with JavaScript disabled, an
+offline context, blocked service workers and every resource route aborted. It
+renders the same escaped/redacted report without network access.
+
+If Chromium fails, the optional WeasyPrint backend is tried. Install that fallback
+with `python -m pip install -r requirements-chatcheck-pdf.txt` or the package's
+`[pdf]` extra. On Windows, WeasyPrint also needs native libraries including Pango;
+follow its
 [official installation instructions](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html).
-PDF rendering receives only the same escaped, redacted HTML and denies URL-based
+The fallback receives only the same escaped, redacted HTML and denies URL-based
 network, local-file and data resources. Fonts are resolved from installed system
 fonts. See the [WeasyPrint API](https://doc.courtbouillon.org/weasyprint/stable/api_reference.html)
 and [Jinja autoescaping documentation](https://jinja.palletsprojects.com/en/stable/api/)
-for the underlying APIs.
+for the underlying APIs. If neither renderer works, HTML is retained and a clear
+message gives both installation options; successful HTML generation still exits 0.
 
 ## Verification checklist
 
@@ -193,6 +203,7 @@ python -m pytest -q -p no:cacheprovider
 - Urdu text survives UTF-8 output and has RTL direction; Roman Urdu remains LTR.
 - Comparisons distinguish fixes, regressions, uncertainty and changed definitions.
 - Labels/metrics appear only when stored; reports never call a judge or label items.
-- Missing PDF dependencies leave HTML available with a clear message; mocked PDF
-  tests verify safe HTML input and denied resource loading.
+- Missing PDF backends leave HTML available with a clear message. A real-browser
+  test verifies a multipage PDF and footer numbers; mocked tests also verify safe
+  HTML input, offline context settings and denied resource loading.
 - Weak/hardened samples retain all 76 appendix rows and their original outcomes.

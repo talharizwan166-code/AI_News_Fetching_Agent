@@ -270,7 +270,47 @@ def deny_resource(url, *args, **kwargs):
     raise ValueError("Report PDF resource loading is disabled")
 
 
-def pdf_bytes(html):
+def chromium_launch_options(executable_path):
+    """Use Playwright's exact browser revision, including this repo's local install."""
+    expected = Path(executable_path)
+    if expected.is_file():
+        return {"executable_path": str(expected)}
+    if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        parts = expected.parts
+        revision = next((i for i, part in enumerate(parts) if part.startswith("chromium-")), None)
+        if revision is not None:
+            for root in (Path(__file__).resolve().parents[1], Path.cwd()):
+                candidate = root / ".tools" / "playwright" / Path(*parts[revision:])
+                if candidate.is_file():
+                    return {"executable_path": str(candidate)}
+    return None
+
+
+def chromium_pdf_bytes(html):
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        options = chromium_launch_options(playwright.chromium.executable_path)
+        if options is None:
+            raise FileNotFoundError("Playwright Chromium is not installed")
+        browser = playwright.chromium.launch(headless=True, args=["--disable-background-networking", "--disable-component-update", "--no-pings"], **options)
+        try:
+            context = browser.new_context(offline=True, java_script_enabled=False, service_workers="block")
+            context.route("**/*", lambda route: route.abort("blockedbyclient"))
+            page = context.new_page()
+            print_style = "<style>@page { size: A4; margin: 17mm 14mm 18mm; @bottom-right { content: none; } }</style>"
+            print_html = html.replace("</head>", print_style + "</head>", 1) if "</head>" in html else html + print_style
+            page.set_content(print_html, wait_until="load", timeout=15000)
+            page.emulate_media(media="print")
+            return page.pdf(format="A4", print_background=True, prefer_css_page_size=False,
+                            margin={"top": "17mm", "right": "14mm", "bottom": "18mm", "left": "14mm"},
+                            display_header_footer=True, header_template="<span></span>",
+                            footer_template='<div style="width:100%;text-align:center;font-size:9px;color:#64748b"><span class="pageNumber"></span> / <span class="totalPages"></span></div>')
+        finally:
+            browser.close()
+
+
+def weasyprint_pdf_bytes(html):
     from weasyprint import HTML
     # WeasyPrint 70 uses a URLFetcher object; older installed versions accept
     # a callable. Both paths refuse network, data and local file resources.
@@ -285,6 +325,18 @@ def pdf_bytes(html):
                 return deny_resource(url)
         fetcher = OfflineFetcher()
     return HTML(string=html, url_fetcher=fetcher).write_pdf()
+
+
+def pdf_bytes(html):
+    """Prefer Chromium; retain WeasyPrint as an independently optional fallback."""
+    for renderer in (chromium_pdf_bytes, weasyprint_pdf_bytes):
+        try:
+            return renderer(html)
+        except Exception:
+            # Upstream errors can include local paths or content. Keep the CLI
+            # diagnostic stable and free of report text and credentials.
+            continue
+    raise RuntimeError("Neither Chromium nor WeasyPrint could export this report")
 
 
 def write_report(run, out, *, pdf=False, **options):
@@ -302,7 +354,7 @@ def write_report(run, out, *, pdf=False, **options):
         try:
             rendered = pdf_bytes(html)
         except Exception as exc:
-            return message + f"\nPDF not generated ({type(exc).__name__}). Install requirements-chatcheck-pdf.txt and the WeasyPrint native dependencies (Pango on Windows). The HTML report is available."
+            return message + f"\nPDF not generated ({type(exc).__name__}). Install the browser with python -m playwright install chromium, or install requirements-chatcheck-pdf.txt and WeasyPrint native dependencies as a fallback. The HTML report is available."
         with pdf_path.open("xb") as stream:
             stream.write(rendered)
         message += f"\nPDF report written: {pdf_path}"

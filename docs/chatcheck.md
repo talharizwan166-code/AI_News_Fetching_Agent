@@ -13,6 +13,9 @@ real-provider commands. Existing rule checks remain enabled; judging defaults of
 Phase 2B adds [client-ready HTML reports and optional PDF export](chatcheck-reports.md),
 including redacted evidence, inline charts, a full appendix and before/after comparisons.
 
+Phase 2C adds [installation, reliable PDF export, workspace setup and client data retention](chatcheck-operations.md).
+Install the package for a `chatcheck` console command; `python -m chatcheck` remains supported.
+
 ## Quick start
 
 From the repository root, activate the virtual environment and install the engine:
