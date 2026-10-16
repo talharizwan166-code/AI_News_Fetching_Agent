@@ -25,9 +25,11 @@
         <dt>Run status</dt><dd>{{ status }}</dd>
       </dl>
       <div class="score-card">
-        <span class="score-label">Overall test pass score</span>
-        <strong>{{ overall.display }}</strong>
-        <span>{{ overall.passed }} / {{ overall.total }} tests passed</span>
+        <span class="score-label">Response-only test pass score</span>
+        <strong>{{ headline.display }}</strong>
+        <span>{{ headline.passed }} / {{ headline.total }} tests with responses passed</span>
+        <span>{{ coverage.errors }} connector errors · {{ coverage.not_run }} tests without a usable response / {{ coverage.planned }} planned</span>
+        <span>Errors counted as not-run: {{ coverage.errors_as_not_run.display }} ({{ coverage.errors_as_not_run.passed }} / {{ coverage.planned }})</span>
         <span class="score-footnote">Hybrid verdicts with rule fallback</span>
       </div>
     </div>
@@ -38,7 +40,7 @@
     <p class="eyebrow">01 / THE RESULT</p>
     <h2>Executive summary</h2>
     <div class="summary">{% for sentence in summary %}<p>{{ sentence }}</p>{% endfor %}</div>
-    <p class="note">The score is passed tests divided by all tests in this saved run. Failures, uncertain results and pending tests receive no pass credit. It is not a probability of safety.</p>
+    <p class="note">The headline and score bars use tests with usable responses only. Errors are counted as not-run, not as behavior failures; the all-planned score and coverage are shown separately. Uncertain and unjudged responses receive no pass credit. It is not a probability of safety.</p>
   </section>
 
   <section id="scores">
@@ -112,6 +114,10 @@
   {% endif %}
 
   <section id="scope-and-limits">
+    {% if target_llm %}<p>Real target: {{ target_llm.provider }} / {{ target_llm.model }}. Raw model responses were evaluated with confidential synthetic data seeded in the system prompt. The target model is separate from the verdict judge.</p>{% endif %}
+    {% if not_run %}<p>{{ not_run }} tests were not run because the target stopped or its budget was exhausted. They receive no pass credit.</p>{% endif %}
+    {% if connector_errors %}<p>{{ connector_errors }} tests ended with connector errors and receive no pass credit. Investigate transport and provider availability before interpreting these failures as model behavior.</p>{% endif %}
+    {% if retry_count %}<p>{{ retry_count }} explicit target retry reservations are recorded. Original attempts and previous judgments remain in the local audit history; only the latest response is scored. Successful model responses are never re-sampled by the retry tool.</p>{% endif %}
     <p class="eyebrow">INTERPRETATION / SCOPE AND LIMITS</p>
     <h2>Scope and limits</h2>
     <p>This report covers {{ overall.total }} saved tests across {{ categories|length }} category labels and {{ languages|length }} language labels. Run status: {{ status }}.</p>
@@ -123,6 +129,7 @@
     <ul>{% for item in not_tested %}<li>{{ item }}</li>{% endfor %}</ul>
     <h3>Judges and human review</h3>
     <p>Deterministic rule checks are retained for every evaluated test. The score uses saved hybrid verdicts with rule fallback; human labels do not override these verdicts. {{ review_count }} items carry a human-review flag.</p>
+    <p>Raw connector-error verdicts remain in the audit and appendix. Scoring counts those errors as not-run and excludes them from the response-only headline.</p>
     {% if agreement.judge_provenance %}
     <p>{{ llm_judged }} / {{ overall.total }} tests have a completed LLM or fake-provider evaluation. Recorded judge provenance:</p>
     <ul>{% for judge in agreement.judge_provenance %}<li>{{ judge.provider }} / {{ judge.model }} / rubric {{ judge.rubric_version }} ({{ judge.items }} items with stored judge records).</li>{% endfor %}</ul>
@@ -147,7 +154,7 @@
     <p class="note">Every saved test appears below, including uncertain and pending outcomes. Not judged means the LLM produced no valid recorded verdict; it does not imply a pass.</p>
     <table class="appendix-table">
       <thead><tr><th>Test / check reason</th><th>Category / language</th><th>Severity</th><th>Rule</th><th>LLM</th><th>Hybrid</th><th>Human</th></tr></thead>
-      <tbody>{% for item in appendix %}<tr><td><bdi>{{ item.test_key }}</bdi><div class="reason" dir="auto">{{ item.reason }}</div><details><summary>Prompt and response</summary><h4>Exact prompt</h4><pre class="evidence" dir="{{ item.prompt_dir }}" lang="{{ 'ur' if item.prompt_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.prompt }}</pre><h4>Response excerpt</h4><pre class="evidence" dir="{{ item.response_dir }}" lang="{{ 'ur' if item.response_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.response }}</pre></details></td><td>{{ item.category }}<br>{{ item.language }}</td><td>{{ item.severity }}</td><td>{{ item.rule }}</td><td>{{ item.llm }}</td><td><strong>{{ item.hybrid }}</strong></td><td>{{ item.human }}</td></tr>{% endfor %}</tbody>
+      <tbody>{% for item in appendix %}<tr><td><bdi>{{ item.test_key }}</bdi>{% if not item.received %}<div class="reason">No model response; excluded from headline.</div>{% endif %}<div class="reason" dir="auto">{{ item.reason }}</div><details><summary>Prompt and response</summary><h4>Exact prompt</h4><pre class="evidence" dir="{{ item.prompt_dir }}" lang="{{ 'ur' if item.prompt_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.prompt }}</pre><h4>Response excerpt</h4><pre class="evidence" dir="{{ item.response_dir }}" lang="{{ 'ur' if item.response_dir == 'rtl' else 'ur-Latn' if item.language == 'roman_ur' else 'en' }}">{{ item.response }}</pre>{% if item.attempts|length > 1 %}<h4>Attempt history</h4><ul>{% for attempt in item.attempts %}<li>Attempt {{ attempt.number }}: {{ attempt.error or attempt.status }}</li>{% endfor %}</ul>{% endif %}</details></td><td>{{ item.category }}<br>{{ item.language }}</td><td>{{ item.severity }}</td><td>{{ item.rule }}</td><td>{{ item.llm }}</td><td><strong>{{ item.hybrid }}</strong></td><td>{{ item.human }}</td></tr>{% endfor %}</tbody>
     </table>
   </section>
   <footer>Chatcheck · {{ client }} · {{ run_id }}</footer>

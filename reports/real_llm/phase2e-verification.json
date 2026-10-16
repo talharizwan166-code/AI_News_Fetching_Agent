@@ -1,0 +1,148 @@
+{
+  "original_calls": 96,
+  "retry_calls": 12,
+  "max_retry_calls": 12,
+  "max_output_tokens": 512,
+  "additional_calls_on_rerun": 0,
+  "original_ledger_byte_identical": true,
+  "protected_tests_unchanged": 84,
+  "original_attempts_preserved": 96,
+  "new_attempts": 12,
+  "total_attempts": 108,
+  "model_responses": 96,
+  "remaining_errors": 0,
+  "scores_before": {
+    "e4f331e7-4b25-48c7-9fda-842fc6a55298": {
+      "planned": 76,
+      "received": 68,
+      "errors": 8,
+      "not_run": 8,
+      "responses_only": {
+        "total": 68,
+        "passed": 52,
+        "failed": 16,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 76.5,
+        "display": "76.5%",
+        "bar_width": "76.5"
+      },
+      "errors_as_not_run": {
+        "total": 76,
+        "passed": 52,
+        "failed": 16,
+        "uncertain": 0,
+        "pending": 8,
+        "percent": 68.4,
+        "display": "68.4%",
+        "bar_width": "68.4"
+      }
+    },
+    "9de5255b-6552-4f91-9090-af7e778f4c41": {
+      "planned": 20,
+      "received": 16,
+      "errors": 4,
+      "not_run": 4,
+      "responses_only": {
+        "total": 16,
+        "passed": 7,
+        "failed": 9,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 43.8,
+        "display": "43.8%",
+        "bar_width": "43.8"
+      },
+      "errors_as_not_run": {
+        "total": 20,
+        "passed": 7,
+        "failed": 9,
+        "uncertain": 0,
+        "pending": 4,
+        "percent": 35.0,
+        "display": "35.0%",
+        "bar_width": "35.0"
+      }
+    }
+  },
+  "scores_after": {
+    "e4f331e7-4b25-48c7-9fda-842fc6a55298": {
+      "planned": 76,
+      "received": 76,
+      "errors": 0,
+      "not_run": 0,
+      "responses_only": {
+        "total": 76,
+        "passed": 57,
+        "failed": 19,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 75.0,
+        "display": "75.0%",
+        "bar_width": "75.0"
+      },
+      "errors_as_not_run": {
+        "total": 76,
+        "passed": 57,
+        "failed": 19,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 75.0,
+        "display": "75.0%",
+        "bar_width": "75.0"
+      }
+    },
+    "9de5255b-6552-4f91-9090-af7e778f4c41": {
+      "planned": 20,
+      "received": 20,
+      "errors": 0,
+      "not_run": 0,
+      "responses_only": {
+        "total": 20,
+        "passed": 8,
+        "failed": 12,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 40.0,
+        "display": "40.0%",
+        "bar_width": "40.0"
+      },
+      "errors_as_not_run": {
+        "total": 20,
+        "passed": 8,
+        "failed": 12,
+        "uncertain": 0,
+        "pending": 0,
+        "percent": 40.0,
+        "display": "40.0%",
+        "bar_width": "40.0"
+      }
+    }
+  },
+  "candidate_items": 31,
+  "candidate_assessments": {
+    "possible_false_failure": 30,
+    "needs_manual_review": 1
+  },
+  "sample_items": 100,
+  "usable_real_sample_items": 49,
+  "sample_real_languages": {
+    "roman_ur": 14,
+    "en": 22,
+    "ur": 13
+  },
+  "human_labels": 0,
+  "suite_checks_changed": false,
+  "main_changelog_entries": 0,
+  "heldout_changelog_entries": 0,
+  "pdf_pages": {
+    "main": 14,
+    "heldout": 9
+  },
+  "credential_matches": 0,
+  "synthetic_report_matches": 0,
+  "pytest": {
+    "passed": 640,
+    "skipped": 2
+  }
+}

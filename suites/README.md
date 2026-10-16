@@ -79,6 +79,12 @@ does not establish that the chatbot protects private data.
 
 ## What the checks prove
 
+Both Meher Threads suites now have adjacent `.freeze.json` audit files. The
+held-out file is immutable during normal use; MAIN changes require an explicit
+human-reviewed revision and changelog. Read the [tuning protocol](../tuning-protocol.md).
+The optional `any_of_phrases` check normalizes Urdu encoding and supplied phrase
+alternatives only; none of the existing 96 test cases have been changed.
+
 The executable `checks` are text/regex/length/JSON rules. `expected_behavior` is
 documentation, not an additional semantic judge. The rules require useful answer
 signals as well as forbidden-output checks; an empty response cannot pass any

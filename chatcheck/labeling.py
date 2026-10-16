@@ -5,10 +5,16 @@ import random
 from collections import defaultdict
 
 
-def build_sample(storage, run_ids=None, *, size=100, seed=42):
+def build_sample(storage, run_ids=None, *, size=100, seed=42, real_run_ids=None, min_real=0):
     if type(size) is not int or size < 1:
         raise ValueError("Sample size must be positive")
     runs = [storage.results(run_id) for run_id in (run_ids or [run["id"] for run in storage.list_runs()])]
+    real_run_ids = set(real_run_ids or [])
+    if type(min_real) is not int or not 0 <= min_real <= size:
+        raise ValueError("Real-run quota must be between zero and sample size")
+    if not real_run_ids <= {run["id"] for run in runs}:
+        raise ValueError("Real runs must belong to the selected source runs")
+    real_ids = set()
     pool, required, strata = {}, {}, defaultdict(list)
     for run in runs:
         heldout = "heldout" in run["suite_path"].lower() or "held-out" in run["suite_path"].lower()
@@ -17,6 +23,8 @@ def build_sample(storage, run_ids=None, *, size=100, seed=42):
                 continue
             test_id = test["id"]
             pool[test_id] = test
+            if run["id"] in real_run_ids and test["responses"] and test["responses"][-1].get("text") and not test["responses"][-1].get("error"):
+                real_ids.add(test_id)
             reasons = []
             if heldout and (not test["verdict"]["passed"] or test["combined_verdict"]["verdict"] == "fail" or (test["llm_verdict"] or {}).get("verdict") == "fail"):
                 reasons.append("heldout_failure")
@@ -28,6 +36,22 @@ def build_sample(storage, run_ids=None, *, size=100, seed=42):
             strata[(test.get("category"), test.get("language"), run["target_name"])].append(test_id)
     rng = random.Random(seed)
     selected = dict.fromkeys(sorted(required))
+    if len(real_ids) < min_real:
+        raise ValueError(f"Real-run quota requires {min_real} usable responses; only {len(real_ids)} available")
+    # Fill the real quota first. Prefer the least represented language, then
+    # category/language cell and category. Seeded ties keep selection reproducible.
+    candidates = sorted(real_ids - set(selected))
+    rng.shuffle(candidates)
+    while len(real_ids & set(selected)) < min_real:
+        chosen = [pool[key] for key in real_ids & set(selected)]
+        def balance(key):
+            test = pool[key]
+            return (sum(t["language"] == test["language"] for t in chosen),
+                    sum((t["category"], t["language"]) == (test["category"], test["language"]) for t in chosen),
+                    sum(t["category"] == test["category"] for t in chosen))
+        key = min(candidates, key=balance)
+        selected[key] = None
+        candidates.remove(key)
     groups = list(strata.values())
     for group in groups:
         rng.shuffle(group)
@@ -58,6 +82,8 @@ def build_sample(storage, run_ids=None, *, size=100, seed=42):
     metadata = {"seed": seed, "requested_size": size, "size": len(test_ids), "pool_size": len(pool),
                 "runs": [run["id"] for run in runs], "mandatory": {str(k): v for k, v in required.items()},
                 "strategy": "all heldout failures and judge disagreements; cover category/language cells, then random round-robin target strata"}
+    if real_run_ids:
+        metadata.update(real_runs=sorted(real_run_ids), min_real=min_real, real_items=len(real_ids & set(selected)))
     return storage.save_sample(test_ids, metadata), metadata
 
 

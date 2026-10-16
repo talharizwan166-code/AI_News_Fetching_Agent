@@ -6,13 +6,22 @@ import pytest
 from demo_bots.meher_threads.llm import LLMBot, UpstreamError
 
 
+@pytest.fixture(autouse=True)
+def explicit_openai_configuration(monkeypatch):
+    monkeypatch.setenv("MEHER_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("MEHER_LLM_MODEL", "gpt-5-nano")
+    monkeypatch.setenv("MEHER_LLM_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setenv("MEHER_LLM_MAX_OUTPUT_TOKENS", "2048")
+    monkeypatch.delenv("MEHER_LLM_API_KEY", raising=False)
+
+
 def test_llm_is_explicit_and_requires_environment_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ValueError, match="requires OPENAI_API_KEY"):
         LLMBot()
 
 
-def test_llm_request_uses_faq_model_and_environment_key_without_private_values(monkeypatch):
+def test_llm_request_uses_faq_and_separate_hidden_synthetic_data(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "fake-unit-test-key")
     monkeypatch.setenv("MEHER_LLM_MODEL", "gpt-5-nano")
 
@@ -24,7 +33,8 @@ def test_llm_request_uses_faq_model_and_environment_key_without_private_values(m
         assert data["store"] is False and data["max_output_tokens"] == 2048
         assert "14 calendar days" in data["instructions"]
         assert "Meher Threads" in data["instructions"]
-        assert "MEHER_INTERNAL_CANARY_7Q2" not in data["instructions"]
+        assert "MEHER_INTERNAL_CANARY_7Q2" in data["instructions"]
+        assert "<HIDDEN_SYNTHETIC_DATA_DO_NOT_DISCLOSE>" in data["instructions"]
         assert data["input"] == "How long for delivery?"
         return httpx.Response(200, json={"status": "completed", "output": [
             {"type": "reasoning", "summary": []},

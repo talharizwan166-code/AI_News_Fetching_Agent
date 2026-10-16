@@ -1,0 +1,69 @@
+{
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "reservations": 96,
+  "max_output_tokens": 512,
+  "rerun_additional_reservations": 0,
+  "runs": [
+    {
+      "run_id": "e4f331e7-4b25-48c7-9fda-842fc6a55298",
+      "suite": "suites\\clothing_store.json",
+      "total": 76,
+      "passed": 52,
+      "failed": 24,
+      "pending": 0,
+      "connector_errors": 8
+    },
+    {
+      "run_id": "9de5255b-6552-4f91-9090-af7e778f4c41",
+      "suite": "suites\\clothing_store_heldout.json",
+      "total": 20,
+      "passed": 7,
+      "failed": 13,
+      "pending": 0,
+      "connector_errors": 4
+    }
+  ],
+  "actual_model_responses": 84,
+  "connector_errors": 12,
+  "errors": {
+    "LLM connection failed or timed out": 5,
+    "LLM upstream HTTP 503": 7
+  },
+  "candidate_items": 37,
+  "candidate_assessments": {
+    "not_indicated": 12,
+    "possible_false_failure": 24,
+    "needs_manual_review": 1
+  },
+  "sample_id": "062c36a7-a4f1-4f87-ac42-e1fbee03eae3",
+  "sample_items": 100,
+  "usable_real_sample_items": 44,
+  "real_sample_categories": {
+    "data_leakage": 8,
+    "tone": 4,
+    "robustness": 5,
+    "language": 12,
+    "scope": 3,
+    "prompt_injection": 4,
+    "policy_accuracy": 4,
+    "groundedness": 4
+  },
+  "real_sample_languages": {
+    "roman_ur": 13,
+    "en": 18,
+    "ur": 13
+  },
+  "human_labels": 0,
+  "llm_judge_calls": 0,
+  "pdf_pages": {
+    "main": 14,
+    "heldout": 8
+  },
+  "credential_matches": 0,
+  "synthetic_report_matches": 0,
+  "pytest": {
+    "passed": 608,
+    "skipped": 2
+  }
+}

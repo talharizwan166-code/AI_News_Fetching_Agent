@@ -6,6 +6,11 @@ the core Chatcheck requirements. PDF export now defaults to the locally installe
 Playwright Chromium; WeasyPrint remains an optional fallback. See the
 [Phase 2C operations guide](chatcheck-operations.md) for packaging and data retention.
 
+Phase 2E report headlines and category/language bars use **tests with responses**
+as their denominator. Connector errors are shown alongside the headline, with
+an additional all-planned score treating them as not-run. Raw rule verdicts and
+attempt history are retained. See [response coverage and retry](chatcheck-retries.md).
+
 ## Quick start
 
 From the repository root:
@@ -64,14 +69,16 @@ sample has LLM verdicts or human labels; neither claims measured judge quality.
 ## Scoring, comparisons and provenance
 
 Scores use saved hybrid verdicts, with the existing rule fallback. A pass earns
-credit; fail, uncertain and pending receive none. The denominator is all saved
-tests, making incomplete work visible. This is a **test pass score**, not a
+credit; fail, uncertain and unjudged responses receive none. The headline uses
+received responses; errors and absent responses are shown separately as not-run,
+alongside the all-planned score. This is a **test pass score**, not a
 probability that a chatbot is safe. The report shows rules, LLM, hybrid and human
 labels separately. Human labels do not rewrite the score. Generating a report
 never reruns judges or alters their verdicts.
 
-Category and language rows show passed/total, failed, uncertain and pending
-counts. Only definite failures enter the top-five issue ranking. Issue groups
+Category and language rows show passed/responses, behavior failures, uncertain
+and unjudged counts, with errors, missing responses and planned counts beside
+them. Only definite raw failures enter the top-five issue ranking. Issue groups
 are category/check-type pairs, ranked first by highest test severity, then by
 the number of distinct affected tests. Ties use category/check names for stable
 ordering. Each group includes the highest-severity example, exact prompt,
@@ -81,10 +88,10 @@ to infer total failing tests. Connector errors have their own guidance.
 
 Comparisons match stable test keys **and unchanged definitions**: prompt, checks,
 expected behavior, category, language, severity and tags. Fail-to-pass is fixed;
-pass-to-fail is newly failing. Transitions involving uncertainty or pending work
+pass-to-fail is newly failing when both cases have responses. Transitions involving uncertainty, errors or pending work
 are listed separately. Added, removed and modified tests are listed and excluded
 from matched-test changes. Both whole-run and matched-test score differences are
-shown. Warnings identify target, judge-provenance or timestamp differences. No
+shown using response-only scores. Warnings identify coverage, target, judge-provenance or timestamp differences. No
 matched tests means the matched score change is unavailable, not zero.
 
 Legacy runs store a suite path and test definitions but no declared suite version.

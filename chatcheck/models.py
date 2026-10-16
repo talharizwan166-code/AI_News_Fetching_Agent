@@ -65,9 +65,17 @@ def read_json(path: str | Path):
 
 
 def load_suite(path: str | Path) -> list[TestCase]:
+    data = read_json(path)
+    tests = parse_suite(data)
+    from .tuning import verify_suite
+    verify_suite(path, data)
+    return tests
+
+
+def parse_suite(data) -> list[TestCase]:
+    """Validate in-memory definitions; file consumers must use load_suite."""
     from .judge import validate_checks
 
-    data = read_json(path)
     rows = data.get("tests") if isinstance(data, dict) else data
     if not isinstance(rows, list) or not rows:
         raise ValueError("Suite must be a nonempty array or an object containing 'tests'")

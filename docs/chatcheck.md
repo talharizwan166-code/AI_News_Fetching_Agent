@@ -16,6 +16,12 @@ including redacted evidence, inline charts, a full appendix and before/after com
 Phase 2C adds [installation, reliable PDF export, workspace setup and client data retention](chatcheck-operations.md).
 Install the package for a `chatcheck` console command; `python -m chatcheck` remains supported.
 
+Phase 2D adds a [capped real Gemini/OpenAI target run and human review sample](chatcheck-real-llm.md).
+
+Phase 2E adds [error-only retries and response-coverage scoring](chatcheck-retries.md)
+and a [tuning protocol](../tuning-protocol.md) with frozen held-out controls and
+human-reviewed MAIN check revisions. Existing suite cases remain unchanged.
+
 ## Quick start
 
 From the repository root, activate the virtual environment and install the engine:
@@ -338,30 +344,31 @@ result, not a claim of general model security, semantic correctness or fluency.
 
 ### Optional LLM mode (off by default)
 
-Set `OPENAI_API_KEY` in the environment of the server process and optionally set
-`MEHER_LLM_MODEL`. The default is the low-cost
-[`gpt-5-nano`](https://developers.openai.com/api/docs/models/gpt-5-nano). The
-[Responses API](https://developers.openai.com/api/docs/guides/text) system
-instructions include the public FAQ. Private fixture values stay on the local
-server and are excluded from those instructions. The `.env.example` placeholders
-are documented but not automatically loaded.
+Choose Gemini or OpenAI using `MEHER_LLM_PROVIDER` and explicitly configure
+`MEHER_LLM_MODEL` and `MEHER_LLM_BASE_URL`. Keys come from `MEHER_LLM_API_KEY`
+or the corresponding `GEMINI_API_KEY` / `OPENAI_API_KEY`. The system prompt uses
+public FAQ facts and a separate hidden block of synthetic private data so leakage
+probes exercise real model behavior. No test definitions are sent to the bot.
+The `.env.example` placeholders are not automatically loaded.
 
 ```powershell
-# After setting OPENAI_API_KEY in this terminal:
-$env:MEHER_LLM_MODEL = 'gpt-5-nano'
+# After setting GEMINI_API_KEY securely in this terminal:
+$env:MEHER_LLM_PROVIDER = 'gemini'
+$env:MEHER_LLM_MODEL = 'gemini-3.5-flash-lite'
+$env:MEHER_LLM_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
 .\.venv\Scripts\python.exe -m demo_bots.meher_threads --mode llm
 # Another terminal, only when you want to incur model API usage:
 .\.venv\Scripts\python.exe -m chatcheck run --target examples/chatcheck/target.meher.llm.json --suite suites/clothing_store.json --db meher-llm.db
 ```
 
 LLM mode listens on port 8768 and makes paid external requests. It is not part of
-the offline comparison and is not deterministic. The adapter uses `store: false`,
-a 2,048-token output cap and a 45-second upstream timeout. Its target config uses
-one worker and no retries. Missing keys fail startup; unsuccessful or incomplete
-upstream replies produce errors rather than fabricated fallback answers. Known
-private values are blocked in output, but that exact-value guard is not a general
-LLM security guarantee. API tests use a fake transport; no live paid API run was
-performed for the saved baseline.
+the offline comparison. The default caps are 96 cumulative target calls and 512
+output tokens per call, with a 45-second timeout and no adapter retries. OpenAI
+uses `store: false`; provider-side retention is governed by the provider. Failed
+requests consume a reservation. The standalone server retains its exact-value
+output guard. The [real-run script](chatcheck-real-llm.md) bypasses that guard for
+evaluation, records uncalled tests as not run, and redacts client reports. Its
+saved real runs are separate from the historical deterministic baseline.
 
 ### Rebuild and verify
 

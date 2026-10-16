@@ -10,6 +10,11 @@ reports, redaction and before/after comparisons; [sample reports](reports/meher_
 show the weak and hardened demo targets.
 The [operations guide](docs/chatcheck-operations.md) covers editable/wheel installation,
 Chromium PDF export, `chatcheck init`, and confirmed deletion with `chatcheck purge`.
+The [real LLM guide](docs/chatcheck-real-llm.md) covers Gemini/OpenAI targets,
+persistent call caps, paraphrase review candidates and the real-response labeling quota.
+The [retry guide](docs/chatcheck-retries.md) covers a separate explicit retry cap
+and response-only scores; the [tuning protocol](tuning-protocol.md) protects the
+held-out suite and requires human review plus a changelog for MAIN revisions.
 The [mutation audit](reports/meher_threads/mutation/README.md) records original
 coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
 

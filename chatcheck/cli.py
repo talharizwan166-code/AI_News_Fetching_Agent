@@ -21,18 +21,26 @@ def print_results(result):
     print(f"Run: {result['id']} ({result['status']})")
     for test in result["tests"]:
         verdict = test["verdict"]
-        label = "PENDING" if verdict is None else "PASS" if verdict["passed"] else "FAIL"
+        label = ("NOT RUN" if test.get("execution_status") == "not_run" else "PENDING") if verdict is None else "PASS" if verdict["passed"] else "FAIL"
         latency = test["responses"][-1]["latency_ms"] if test["responses"] else 0
-        reason = verdict["reason"] if verdict else "No verdict recorded"
+        reason = verdict["reason"] if verdict else test.get("not_run_reason") or "No verdict recorded"
         category = test.get("category") or "unspecified"
         severity = test.get("severity") or "unspecified"
         print(f"{label:7} {test['test_key']}  category={category} severity={severity}  {latency:.1f} ms  {reason}")
+        if test.get("retry_history"):
+            for attempt in test["responses"]:
+                print(f"        attempt {attempt['attempt']}: {attempt['error'] or 'response received'}")
         if test.get("llm_verdict"):
             llm, combined = test["llm_verdict"], test["combined_verdict"]
             flag = " DISAGREEMENT: human review" if combined["disagreement"] else " REVIEW" if combined["review"] else ""
             print(f"        rule={label.lower()} llm={llm.get('verdict') or 'not judged'} hybrid={combined['verdict']}{flag}; {llm['reason']}")
     summary = result["summary"]
     print(f"{summary['passed']} passed, {summary['failed']} failed, {summary['pending']} pending / {summary['total']} tests")
+    from .scoring import coverage_scores
+    coverage = coverage_scores(result["tests"])
+    response_score, all_score = coverage["responses_only"], coverage["errors_as_not_run"]
+    print(f"Response-only score: {response_score['passed']}/{response_score['total']} ({response_score['display']}); {coverage['errors']} connector errors, {coverage['not_run']} without a response")
+    print(f"Errors counted as not-run: {all_score['passed']}/{all_score['total']} ({all_score['display']}); {all_score['failed']} behavior failures, {all_score['pending']} not-run or unjudged")
     if any(test.get("llm_verdict") for test in result["tests"]):
         stats = result["judge_summary"]
         print(f"Judge: {stats['calls']} calls, estimated ${stats['estimated_cost']:.6f}; {stats['disagreements']} disagreements, {stats['not_judged']} not judged")
@@ -52,6 +60,17 @@ def parser():
     commands = root.add_subparsers(dest="command", required=True)
     validate = commands.add_parser("validate", help="Validate a JSON suite locally and report metadata counts")
     validate.add_argument("--suite", required=True)
+    freeze = commands.add_parser("freeze", help="Hash a held-out suite and enforce its freeze on every load")
+    freeze.add_argument("--suite", required=True)
+    freeze.add_argument("--role", choices=["heldout", "main"], help="Default heldout; main registers a reviewed-revision baseline")
+    freeze.add_argument("--unfreeze", metavar="REASON", help="Record an explicit exception and immediately freeze the current version")
+    revise = commands.add_parser("revise", help="Revise MAIN checks only with an existing human-reviewed false failure")
+    revise.add_argument("--suite", required=True)
+    revise.add_argument("--test-id", required=True)
+    revise.add_argument("--checks", required=True, help="JSON file containing the proposed new checks array")
+    revise.add_argument("--reason", required=True)
+    revise.add_argument("--review-db", required=True)
+    revise.add_argument("--review-run", required=True)
     run = commands.add_parser("run", help="Run a JSON suite against a target config")
     run.add_argument("--target", required=True)
     run.add_argument("--suite", required=True)
@@ -71,6 +90,8 @@ def parser():
     sample.add_argument("--run", action="append", help="Repeat for multiple runs; default all saved runs")
     sample.add_argument("--size", type=int, default=100)
     sample.add_argument("--seed", type=int, default=42)
+    sample.add_argument("--real-run", action="append", help="Real target run to include; repeat for main and heldout")
+    sample.add_argument("--min-real", type=int, default=40, help="Minimum usable real responses when --real-run is supplied")
     label = commands.add_parser("label", help="Label raw responses without seeing judge verdicts")
     agreement = commands.add_parser("agreement", help="Compare rule, LLM and hybrid with human labels (JSON)")
     report = commands.add_parser("report", help="Generate a self-contained client HTML report from a saved run")
@@ -107,6 +128,17 @@ def main(argv=None):
             stream.reconfigure(errors="backslashreplace")
     args = parser().parse_args(argv)
     try:
+        if args.command == "freeze":
+            from .tuning import freeze_suite, guard_path
+            guard = freeze_suite(args.suite, role=args.role, unfreeze=args.unfreeze)
+            print(f"Frozen {guard['role']} suite: {args.suite}\nSHA-256: {guard['suite_sha256']}\nAudit: {guard_path(args.suite)}")
+            return 0
+        if args.command == "revise":
+            from .tuning import revise_checks, guard_path
+            revise_checks(args.suite, args.test_id, read_json(args.checks), reason=args.reason,
+                          review_db=args.review_db, review_run=args.review_run)
+            print(f"Recorded human-reviewed MAIN revision: {args.test_id}\nChangelog: {guard_path(args.suite)}")
+            return 0
         if args.command == "init":
             from .workspace import init_workspace
             result = init_workspace(args.directory)
@@ -162,7 +194,8 @@ def main(argv=None):
                 print("Imported run: " + storage.import_run(read_json(args.input)))
                 return 0
             if args.command == "sample":
-                sample_id, metadata = build_sample(storage, args.run, size=args.size, seed=args.seed)
+                sample_id, metadata = build_sample(storage, args.run, size=args.size, seed=args.seed,
+                                                   real_run_ids=args.real_run, min_real=args.min_real if args.real_run else 0)
                 print(f"Sample: {sample_id} ({metadata['size']} items, {len(metadata['mandatory'])} mandatory)")
                 return 0
             if args.command in {"label", "agreement"}:

@@ -4,8 +4,10 @@ import json
 import re
 from dataclasses import asdict, dataclass, field
 
+from .text_normalization import normalize_phrase
 
-RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid"}
+
+RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid", "any_of_phrases"}
 
 
 def reject_json_constant(value):
@@ -23,8 +25,12 @@ def validate_checks(checks):
         if set(check) - allowed:
             raise ValueError(f"Unknown fields in {kind} check: {sorted(set(check) - allowed)}")
         if "case_sensitive" in check:
-            if type(check["case_sensitive"]) is not bool or kind in {"min_length", "max_length", "json_valid"}:
+            if type(check["case_sensitive"]) is not bool or kind in {"min_length", "max_length", "json_valid", "any_of_phrases"}:
                 raise ValueError("case_sensitive must be boolean and applies only to text checks")
+        if kind == "any_of_phrases":
+            if (not isinstance(value, list) or not value
+                    or any(not isinstance(phrase, str) or not normalize_phrase(phrase) for phrase in value)):
+                raise ValueError("any_of_phrases requires a nonempty list of phrases that remain nonempty after normalization")
         if kind in {"contains", "not_contains", "equals", "regex"}:
             if not isinstance(value, str) or (kind != "equals" and not value):
                 raise ValueError(f"{kind} requires a {'nonempty ' if kind != 'equals' else ''}string value")
@@ -73,6 +79,9 @@ def judge(text: str | None, checks: list[dict], error: str | None = None) -> Ver
             passed = len(text) >= value
         elif kind == "max_length":
             passed = len(text) <= value
+        elif kind == "any_of_phrases":
+            normalized = normalize_phrase(text)
+            passed = any(normalize_phrase(phrase) in normalized for phrase in expected)
         else:
             try:
                 json.loads(text, parse_constant=reject_json_constant)

@@ -18,11 +18,12 @@ from demo_bots.meher_threads.mutation import evaluate, fingerprints, freeze, sum
 def mutation_run(tmp_path_factory):
     directory = tmp_path_factory.mktemp("mutation")
     output = directory / "results"
-    # Phase 2A changes orchestration/storage. Preserve the historical audit and
-    # require all original bot, suite and deterministic-judge inputs to match it.
+    # Phase 2A changes orchestration/storage; 2D changes the optional LLM adapter;
+    # 2E adds an opt-in check and file-governance validation (authorized audit update).
+    # Preserve the audit and require every deterministic bot/rule/suite to match.
     historical = read_json(ROOT / "reports/meher_threads/mutation/heldout-freeze.json")["files"]
     current = fingerprints(ROOT / "suites/clothing_store.json", ROOT / "suites/clothing_store_heldout.json")
-    orchestration = {"chatcheck/cli.py", "chatcheck/runner.py", "chatcheck/storage.py"}
+    orchestration = {"chatcheck/cli.py", "chatcheck/runner.py", "chatcheck/storage.py", "demo_bots/meher_threads/llm.py", "chatcheck/judge.py", "chatcheck/models.py"}
     assert all(current[path] == checksum for path, checksum in historical.items() if path not in orchestration)
     lock = directory / "phase2a-freeze.json"
     freeze(lock, ROOT / "suites/clothing_store.json", ROOT / "suites/clothing_store_heldout.json")

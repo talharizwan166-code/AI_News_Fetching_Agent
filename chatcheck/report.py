@@ -10,6 +10,7 @@ from pathlib import Path, PureWindowsPath
 
 from .agreement import agreement_report, predictions
 from .models import CATEGORIES, LANGUAGES, SEVERITIES
+from .scoring import coverage_scores, has_response
 
 
 TEMPLATES = Path(__file__).with_name("report_templates")
@@ -92,11 +93,16 @@ def scores(tests):
             "bar_width": f"{percentage or 0:.1f}"}
 
 
-def score_rows(tests, field):
+def score_rows(tests, field, *, response_only=False):
     groups = defaultdict(list)
     for test in tests:
         groups[test.get(field) or "unspecified"].append(test)
-    return [{"name": name, **scores(group)} for name, group in sorted(groups.items())]
+    rows = []
+    for name, group in sorted(groups.items()):
+        coverage = coverage_scores(group)
+        rows.append({"name": name, **(coverage["responses_only"] if response_only else scores(group)),
+                     "planned": coverage["planned"], "errors": coverage["errors"], "not_run": coverage["not_run"]})
+    return rows
 
 
 def compare_runs(current, older):
@@ -105,17 +111,22 @@ def compare_runs(current, older):
     shared = sorted(before.keys() & after.keys())
     modified = [key for key in shared if fingerprint(before[key]) != fingerprint(after[key])]
     matched = [key for key in shared if key not in set(modified)]
-    fixed = [key for key in matched if outcome(before[key]) == "fail" and outcome(after[key]) == "pass"]
-    newly_failing = [key for key in matched if outcome(before[key]) == "pass" and outcome(after[key]) == "fail"]
-    changed_review = [key for key in matched if outcome(before[key]) != outcome(after[key]) and key not in fixed + newly_failing]
-    old_score, new_score = scores(older["tests"]), scores(current["tests"])
-    old_matched = scores([before[key] for key in matched])
-    new_matched = scores([after[key] for key in matched])
+    def compared(test):
+        return outcome(test) if has_response(test) else "not_run"
+    fixed = [key for key in matched if compared(before[key]) == "fail" and compared(after[key]) == "pass"]
+    newly_failing = [key for key in matched if compared(before[key]) == "pass" and compared(after[key]) == "fail"]
+    changed_review = [key for key in matched if compared(before[key]) != compared(after[key]) and key not in fixed + newly_failing]
+    old_coverage, new_coverage = coverage_scores(older["tests"]), coverage_scores(current["tests"])
+    old_score, new_score = old_coverage["responses_only"], new_coverage["responses_only"]
+    old_matched = coverage_scores([before[key] for key in matched])["responses_only"]
+    new_matched = coverage_scores([after[key] for key in matched])["responses_only"]
 
     def delta(left, right):
         return round(right["percent"] - left["percent"], 1) if left["percent"] is not None and right["percent"] is not None else None
 
     warnings = []
+    if old_coverage["not_run"] or new_coverage["not_run"]:
+        warnings.append(f"Response-only scores use {old_coverage['received']}/{old_coverage['planned']} baseline and {new_coverage['received']}/{new_coverage['planned']} current responses; changing coverage can change the score.")
     if older["target_name"] != current["target_name"]:
         warnings.append("Targets differ; interpret this as a comparison of the selected configurations.")
     if modified or before.keys() != after.keys():
@@ -206,14 +217,16 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
     catalog = load_catalog()
     tests = run["tests"]
     overall = scores(tests)
+    coverage = coverage_scores(tests)
+    headline = coverage["responses_only"]
     agreement = agreement_report(tests)
-    categories = score_rows(tests, "category")
-    languages = score_rows(tests, "language")
+    categories = score_rows(tests, "category", response_only=True)
+    languages = score_rows(tests, "language", response_only=True)
     issues = issue_groups(tests, catalog, redactor, response_limit)
     comparison = compare_runs(run, compare) if compare else None
-    summary = [f"The run passed {overall['passed']} of {overall['total']} tests, giving a test pass score of {overall['display']}.",
-               f"There were {overall['failed']} failures, {overall['uncertain']} uncertain results and {overall['pending']} pending results."]
-    failed_categories = sorted({test.get("category") or "unspecified" for test in tests if outcome(test) == "fail"})
+    summary = [f"The run passed {headline['passed']} of {headline['total']} tests with model responses, giving a response-only score of {headline['display']}.",
+               f"Of {overall['total']} planned tests, {coverage['errors']} ended with connector errors and {coverage['not_run']} have no usable response; counting these as not-run gives {coverage['errors_as_not_run']['display']} across all planned tests."]
+    failed_categories = sorted({test.get("category") or "unspecified" for test in tests if has_response(test) and outcome(test) == "fail"})
     summary.append("Failures affected " + ", ".join(name.replace("_", " ") for name in failed_categories) + "." if failed_categories
                    else "No failures were observed in the saved tests; untested behavior remains outside this result.")
     disagreements = []
@@ -232,7 +245,11 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
                          "human": (test.get("human_label") or {}).get("label", "unlabeled"), "reason": rule.get("reason", "No rule verdict"),
                          "prompt": test["prompt"], "response": response_preview(test, redactor, response_limit)[0],
                          "prompt_dir": text_direction(test["prompt"], test.get("language")),
-                         "response_dir": text_direction(test["responses"][-1].get("text") if test["responses"] else "", test.get("language"))})
+                         "response_dir": text_direction(test["responses"][-1].get("text") if test["responses"] else "", test.get("language")),
+                         "received": has_response(test),
+                         "attempts": [{"number": row["attempt"], "error": row.get("error"),
+                                       "status": "Response received" if row.get("text") is not None and not row.get("error") else "No model response"}
+                                      for row in test.get("responses", [])]})
     summary.append(f"{len(disagreements)} rule and LLM disagreements require human review." if disagreements
                    else "No definite rule and LLM disagreements were recorded.")
     summary.append(f"Human labels exist for {agreement['labeled']} tests; agreement is shown in the scope section." if agreement["labeled"]
@@ -252,6 +269,11 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
                "llm_judged": sum(bool(t.get("llm_verdict")) and t["llm_verdict"].get("status") == "judged" for t in tests),
                "review_count": sum(bool(t.get("combined_verdict", {}).get("review")) for t in tests),
                "response_limit": response_limit}
+    context.update(headline=headline, coverage=coverage)
+    context["not_run"] = sum(test.get("execution_status") == "not_run" for test in tests)
+    context["target_llm"] = run.get("options", {}).get("target_llm")
+    context["connector_errors"] = sum(bool(test.get("responses")) and bool(test["responses"][-1].get("error")) for test in tests)
+    context["retry_count"] = sum(len(test.get("retry_history", [])) for test in tests)
     # Redact every displayed string, not just response excerpts: prompts, judge
     # reasons, comparison keys and cover metadata can contain copied secrets too.
     return redactor.tree(context)

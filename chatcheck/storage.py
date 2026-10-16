@@ -105,9 +105,88 @@ class Storage:
                 (test_id, int(verdict.passed), verdict.reason, json.dumps(verdict.checks)),
             )
 
+    def reserve_target_retry(self, test_id, session):
+        """Claim one error-only retry atomically; journal lives with the run."""
+        with self.connection:
+            self.connection.execute("BEGIN IMMEDIATE")
+            test = self.connection.execute("SELECT * FROM tests WHERE id=?", (test_id,)).fetchone()
+            if test is None:
+                raise ValueError("Retry test not found")
+            run = self.connection.execute("SELECT options_json FROM runs WHERE id=?", (test["run_id"],)).fetchone()
+            options = json.loads(run[0])
+            events = options.setdefault("target_retries", [])
+            if any(event["test_key"] == test["test_key"] and event["session"] == session for event in events):
+                return None
+            responses = self.connection.execute("SELECT * FROM responses WHERE test_id=? ORDER BY attempt", (test_id,)).fetchall()
+            # Even an unusual response with text AND an error is protected from
+            # recall. Never improve a failed answer by sampling another answer.
+            if (not responses or not responses[-1]["error"]
+                    or any(isinstance(row["text"], str) and (not row["error"] or row["text"].strip()) for row in responses)):
+                return None
+            verdict = self.connection.execute("SELECT * FROM verdicts WHERE test_id=?", (test_id,)).fetchone()
+            rule = dict(verdict) if verdict else None
+            if rule:
+                rule["passed"] = bool(rule["passed"])
+                rule["checks"] = json.loads(rule.pop("checks_json"))
+            llm = self.connection.execute("SELECT * FROM llm_verdicts WHERE test_id=?", (test_id,)).fetchone()
+            label = self.connection.execute("SELECT * FROM human_labels WHERE test_id=?", (test_id,)).fetchone()
+            event = {"id": str(uuid.uuid4()), "test_key": test["test_key"], "session": session,
+                     "attempt": responses[-1]["attempt"] + 1, "previous_response_id": responses[-1]["id"],
+                     "status": "reserved", "created_at": now(),
+                     "previous_judgments": {"rule": rule, "llm": json.loads(llm["result_json"]) if llm else None,
+                                            "combined": json.loads(llm["combined_json"]) if llm else None,
+                                            "human_label": dict(label) if label else None}}
+            events.append(event)
+            self.connection.execute("UPDATE runs SET options_json=? WHERE id=?", (json.dumps(options), test["run_id"]))
+        return {**event, "run_id": test["run_id"], "test_id": test_id, "prompt": test["prompt"]}
+
+    def finish_target_retry(self, run_id, event_id, text, latency_ms, error, *, sent=True):
+        """Commit the new attempt and current verdict together, retaining history."""
+        from .judge import judge
+        with self.connection:
+            self.connection.execute("BEGIN IMMEDIATE")
+            row = self.connection.execute("SELECT options_json FROM runs WHERE id=?", (run_id,)).fetchone()
+            if row is None:
+                raise ValueError("Retry run not found")
+            options = json.loads(row[0])
+            event = next((item for item in options.get("target_retries", []) if item["id"] == event_id), None)
+            if event is None or event["status"] != "reserved":
+                raise ValueError("Retry event is absent or already finished")
+            test = self.connection.execute("SELECT id, checks_json FROM tests WHERE run_id=? AND test_key=?", (run_id, event["test_key"])).fetchone()
+            last = self.connection.execute("SELECT id FROM responses WHERE test_id=? ORDER BY attempt DESC LIMIT 1", (test["id"],)).fetchone()
+            if last[0] != event["previous_response_id"]:
+                raise ValueError("Retry source changed; refusing to overwrite newer results")
+            if sent:
+                verdict = judge(text, json.loads(test["checks_json"]), error)
+                cursor = self.connection.execute(
+                    "INSERT INTO responses (test_id, attempt, text, latency_ms, error, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (test["id"], event["attempt"], text, latency_ms, error, now()))
+                self.connection.execute(
+                    "INSERT INTO verdicts (test_id, passed, reason, checks_json) VALUES (?, ?, ?, ?) ON CONFLICT(test_id) DO UPDATE SET passed=excluded.passed, reason=excluded.reason, checks_json=excluded.checks_json",
+                    (test["id"], int(verdict.passed), verdict.reason, json.dumps(verdict.checks)))
+                # These judgments apply to the previous response. Their complete
+                # records remain in previous_judgments, never counted as new labels.
+                self.connection.execute("DELETE FROM llm_verdicts WHERE test_id=?", (test["id"],))
+                self.connection.execute("DELETE FROM human_labels WHERE test_id=?", (test["id"],))
+                options.get("not_run", {}).pop(event["test_key"], None)
+                event.update(status="completed", response_id=cursor.lastrowid, finished_at=now())
+            else:
+                event.update(status="stopped", reason=error, finished_at=now())
+            self.connection.execute("UPDATE runs SET options_json=? WHERE id=?", (json.dumps(options), run_id))
+
     def finish_run(self, run_id, status="completed", error=None):
         with self.connection:
             self.connection.execute("UPDATE runs SET finished_at=?, status=?, error=? WHERE id=?", (now(), status, error, run_id))
+
+    def mark_not_run(self, run_id, test_keys, reason):
+        """Persist skip reasons separately from verdicts: an uncalled test cannot fail."""
+        with self.connection:
+            row = self.connection.execute("SELECT options_json FROM runs WHERE id=?", (run_id,)).fetchone()
+            if row is None:
+                raise ValueError(f"Run not found: {run_id}")
+            options = json.loads(row[0])
+            options.setdefault("not_run", {}).update(dict.fromkeys(test_keys, reason))
+            self.connection.execute("UPDATE runs SET options_json=? WHERE id=?", (json.dumps(options), run_id))
 
     def results(self, run_id):
         row = self.connection.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
@@ -133,10 +212,16 @@ class Storage:
             test["combined_verdict"] = json.loads(llm["combined_json"]) if llm else hybrid_verdict(test, None)
             label = self.connection.execute("SELECT * FROM human_labels WHERE test_id=?", (test["id"],)).fetchone()
             test["human_label"] = dict(label) if label else None
+            test["execution_status"] = "attempted" if test["responses"] else "not_run" if test["test_key"] in run["options"].get("not_run", {}) else "pending"
+            test["not_run_reason"] = run["options"].get("not_run", {}).get(test["test_key"]) if not test["responses"] else None
+            test["retry_history"] = [event for event in run["options"].get("target_retries", []) if event["test_key"] == test["test_key"]]
             run["tests"].append(test)
         passed = sum(t["verdict"] is not None and t["verdict"]["passed"] for t in run["tests"])
         failed = sum(t["verdict"] is not None and not t["verdict"]["passed"] for t in run["tests"])
         run["summary"] = {"total": len(run["tests"]), "passed": passed, "failed": failed, "pending": len(run["tests"]) - passed - failed}
+        run["execution_summary"] = {"not_run": sum(t["execution_status"] == "not_run" for t in run["tests"])}
+        from .scoring import coverage_scores
+        run["coverage_scores"] = coverage_scores(run["tests"])
         run["judge_summary"] = self.judge_usage(run_id)
         run["judge_summary"].update({
             "disagreements": sum(t["combined_verdict"]["disagreement"] for t in run["tests"]),
@@ -246,6 +331,11 @@ class Storage:
                         self.connection.execute("DELETE FROM label_samples WHERE id=?", (sample_id,))
                         continue
                     metadata["runs"] = [key for key in metadata.get("runs", []) if key not in selected_set]
+                    if "real_runs" in metadata:
+                        metadata["real_runs"] = [key for key in metadata["real_runs"] if key not in selected_set]
+                        metadata["real_items"] = sum(self.connection.execute(
+                            "SELECT COUNT(*) FROM label_sample_items s JOIN tests t ON t.id=s.test_id WHERE s.sample_id=? AND t.run_id=? AND EXISTS (SELECT 1 FROM responses r WHERE r.test_id=t.id AND r.error IS NULL AND r.text != '' AND r.attempt=(SELECT MAX(r2.attempt) FROM responses r2 WHERE r2.test_id=t.id))",
+                            (sample_id, key)).fetchone()[0] for key in metadata["real_runs"])
                     metadata["mandatory"] = {key: value for key, value in metadata.get("mandatory", {}).items() if key not in test_ids}
                     metadata["size"] = remaining
                     metadata["pool_size"] = sum(self.connection.execute(
