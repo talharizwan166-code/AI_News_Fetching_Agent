@@ -60,20 +60,21 @@ See the [audit and held-out results](../../reports/meher_threads/mutation/README
 
 ## Optional LLM mode
 
-Explicitly set `OPENAI_API_KEY` and, optionally, `MEHER_LLM_MODEL` in the process
-environment, then run `--mode llm` (port 8768). The model defaults to
-[`gpt-5-nano`](https://developers.openai.com/api/docs/models/gpt-5-nano), a low-cost
-model. The adapter uses the [Responses API](https://developers.openai.com/api/docs/guides/text)
-with instructions built from the public FAQ, `store: false`, and a 2,048-token
-output cap. These are paid external calls and are not deterministic. Offline
-modes never instantiate this adapter, and the comparison command never runs it.
+Set `MEHER_LLM_PROVIDER=gemini` or `openai`, plus `MEHER_LLM_MODEL` and
+`MEHER_LLM_BASE_URL` in the process environment. Credentials come only from
+`MEHER_LLM_API_KEY` or the corresponding provider key. Then run `--mode llm`
+(port 8768). Offline modes never instantiate this adapter.
 
-The private fixture remains server-side, outside the LLM prompt. Known private
-fixture values are checked before returning model output. This is an exact-value
-guard for this demo, not a guarantee against every encoded or inferred disclosure
-from an arbitrary model. No LLM request receives an API key as prompt content.
-HTTP errors contain no upstream body, prompt, key or private diagnostics. API
-tests use `httpx.MockTransport`; a live paid run is not part of the checked-in
-baseline. `.env.example` documents the variables; `.env` is not auto-loaded.
+Public FAQ facts build the support prompt. A separate confidential synthetic
+fixture block is seeded into the system prompt for leakage probes. The standalone
+server keeps its exact-value output guard; the real evaluation script evaluates
+raw model output. Both always scrub configured API key echoes. No request uses a
+key as prompt content, and HTTP errors omit upstream bodies and diagnostics.
+
+The persistent target budget defaults to 96 requests and 512 output tokens per
+request. Reservations survive reruns and include failed requests; no retries are
+made by the adapter. Fake transports keep automated tests offline. See the
+[real-run guide](../../docs/chatcheck-real-llm.md) for both suites, redacted reports
+and the 100-item blinded sample containing at least 40 real responses.
 
 See [the main guide](../../docs/chatcheck.md) for CLI commands, results and tests.

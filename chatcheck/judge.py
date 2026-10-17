@@ -6,9 +6,10 @@ from dataclasses import asdict, dataclass, field
 
 from .text_normalization import normalize_phrase
 from .trace_checks import TRACE_RULES, evaluate_trace, validate_trace_check
+from .delivery_checks import DELIVERY_RULES, evaluate_delivery, validate_delivery_check
 
 
-RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid", "any_of_phrases"} | TRACE_RULES
+RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid", "any_of_phrases"} | TRACE_RULES | DELIVERY_RULES
 
 
 def reject_json_constant(value):
@@ -22,6 +23,9 @@ def validate_checks(checks):
         if not isinstance(check, dict) or not isinstance(check.get("type"), str) or check["type"] not in RULES:
             raise ValueError("Unknown check type; supported: " + ", ".join(sorted(RULES)))
         kind, value = check["type"], check.get("value")
+        if kind in DELIVERY_RULES:
+            validate_delivery_check(check)
+            continue
         if kind in TRACE_RULES:
             validate_trace_check(check)
             continue
@@ -68,6 +72,10 @@ def judge(text: str | None, checks: list[dict], error: str | None = None, *, tra
     details = []
     for check in checks:
         kind, expected = check["type"], check.get("value")
+        if kind in DELIVERY_RULES:
+            passed, reason = evaluate_delivery(check, trace)
+            details.append({"type": kind, "passed": passed, "reason": reason})
+            continue
         if kind in TRACE_RULES:
             passed, reason = evaluate_trace(check, trace)
             details.append({"type": kind, "passed": passed, "reason": reason})
