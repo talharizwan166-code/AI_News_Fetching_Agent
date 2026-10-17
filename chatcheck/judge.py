@@ -5,9 +5,10 @@ import re
 from dataclasses import asdict, dataclass, field
 
 from .text_normalization import normalize_phrase
+from .trace_checks import TRACE_RULES, evaluate_trace, validate_trace_check
 
 
-RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid", "any_of_phrases"}
+RULES = {"contains", "not_contains", "equals", "regex", "min_length", "max_length", "json_valid", "any_of_phrases"} | TRACE_RULES
 
 
 def reject_json_constant(value):
@@ -21,6 +22,9 @@ def validate_checks(checks):
         if not isinstance(check, dict) or not isinstance(check.get("type"), str) or check["type"] not in RULES:
             raise ValueError("Unknown check type; supported: " + ", ".join(sorted(RULES)))
         kind, value = check["type"], check.get("value")
+        if kind in TRACE_RULES:
+            validate_trace_check(check)
+            continue
         allowed = {"type", "value", "case_sensitive"}
         if set(check) - allowed:
             raise ValueError(f"Unknown fields in {kind} check: {sorted(set(check) - allowed)}")
@@ -55,7 +59,7 @@ class Verdict:
         return asdict(self)
 
 
-def judge(text: str | None, checks: list[dict], error: str | None = None) -> Verdict:
+def judge(text: str | None, checks: list[dict], error: str | None = None, *, trace=None) -> Verdict:
     validate_checks(checks)
     if error is not None:
         return Verdict(False, f"Connector error: {error}")
@@ -64,6 +68,10 @@ def judge(text: str | None, checks: list[dict], error: str | None = None) -> Ver
     details = []
     for check in checks:
         kind, expected = check["type"], check.get("value")
+        if kind in TRACE_RULES:
+            passed, reason = evaluate_trace(check, trace)
+            details.append({"type": kind, "passed": passed, "reason": reason})
+            continue
         sensitive = check.get("case_sensitive", True)
         actual = text if sensitive else text.casefold()
         value = expected if sensitive or not isinstance(expected, str) else expected.casefold()

@@ -272,6 +272,10 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
     context.update(headline=headline, coverage=coverage)
     context["not_run"] = sum(test.get("execution_status") == "not_run" for test in tests)
     context["target_llm"] = run.get("options", {}).get("target_llm")
+    context["agent_behavior"] = [{"test_key": test["test_key"], "events": test["agent_behavior"]}
+                                 for test in tests if test.get("agent_behavior")]
+    context["sandbox"] = run.get("options", {}).get("sandbox")
+    context["agent_evidence"] = agent_evidence(run, compare)
     context["connector_errors"] = sum(bool(test.get("responses")) and bool(test["responses"][-1].get("error")) for test in tests)
     context["retry_count"] = sum(len(test.get("retry_history", [])) for test in tests)
     # Redact every displayed string, not just response excerpts: prompts, judge
@@ -279,13 +283,58 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
     return redactor.tree(context)
 
 
-def render_report(run, **options):
+def agent_evidence(run, older=None):
+    """Derive observed behavior from events, never from cached finding prose.
+
+    Raw fake drafts are recorded before target validation. A failed raw-draft
+    check does not establish that the target delivered the draft.
+    """
+    before = {t["test_key"]: t for t in older["tests"]} if older else {}
+
+    def counts(test):
+        events = test.get("agent_behavior", [])
+        return {"calls": sum(e["action"] == "llm_call" and e["status"] != "blocked" for e in events),
+                "deliveries": sum(e["action"] in {"issue_created", "email_sent", "post_published"} and e["status"] == "ok" for e in events)}
+
+    return [{"test_key": t["test_key"], "current": counts(t),
+             "before": counts(before[t["test_key"]]) if t["test_key"] in before else None,
+             "reason": (t.get("verdict") or {}).get("reason", "Not evaluated")}
+            for t in run["tests"] if t.get("agent_behavior") and outcome(t) == "fail"]
+
+
+def summary_context(context):
+    """Bound displayed content, explicitly eliding detail; no appendix or raw data."""
+    def shorten(value, limit):
+        text = " ".join(str(value).split())
+        return text if len(text) <= limit else text[:limit] + "… [condensed]"
+
+    result = dict(context)
+    for key in ("client", "target", "suite_name", "suite_version", "run_date", "run_id"):
+        result[key] = shorten(result[key], 100)
+    result["summary"] = [shorten(item, 240) for item in context["summary"][:5]]
+    result["issues"] = [{key: shorten(value, 220 if key in {"why", "fix", "reason"} else 90)
+                          if isinstance(value, str) else value for key, value in issue.items()
+                          if key not in {"prompt", "response"}} for issue in context["issues"][:5]]
+    result["issue_pages"] = [result["issues"][i:i + 3] for i in range(0, len(result["issues"]), 3)] or [[]]
+    result["not_tested"] = [shorten(item, 160) for item in context["not_tested"][:5]]
+    result["scope_omitted"] = max(0, len(context["not_tested"]) - 5)
+    result["agent_evidence"] = [{**row, "test_key": shorten(row["test_key"], 65), "reason": shorten(row["reason"], 150)}
+                                for row in context["agent_evidence"][:5]]
+    result.pop("appendix", None)
+    result.pop("agent_behavior", None)
+    return result
+
+
+def render_report(run, *, summary=False, **options):
     try:
         from jinja2 import Environment, FileSystemLoader, StrictUndefined
     except ImportError:
         raise ValueError("HTML reports require Jinja2; install requirements-chatcheck.txt") from None
     environment = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True, undefined=StrictUndefined)
-    return environment.get_template("report.html").render(**build_context(run, **options))
+    environment.policies["json.dumps_kwargs"] = {"sort_keys": True, "ensure_ascii": False}
+    context = build_context(run, **options)
+    return environment.get_template("summary.html" if summary else "report.html").render(
+        **(summary_context(context) if summary else context))
 
 
 def deny_resource(url, *args, **kwargs):
@@ -361,20 +410,33 @@ def pdf_bytes(html):
     raise RuntimeError("Neither Chromium nor WeasyPrint could export this report")
 
 
-def write_report(run, out, *, pdf=False, **options):
+class SummaryPageLimitError(ValueError):
+    pass
+
+
+def write_report(run, out, *, pdf=False, summary=False, **options):
     out = Path(out)
     if out.suffix.lower() not in {".html", ".htm"}:
         raise ValueError("--out must have an .html or .htm extension")
     pdf_path = out.with_suffix(".pdf")
     if out.exists() or (pdf and pdf_path.exists()):
         raise FileExistsError("Report output already exists; choose a new --out path")
-    html = render_report(run, **options)
+    html = render_report(run, summary=summary, **options)
     with out.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(html)
     message = f"HTML report written: {out}"
     if pdf:
         try:
             rendered = pdf_bytes(html)
+            if summary:
+                # Refuse to emit an overlong summary. Full PDFs retain their
+                # existing renderer/dependency behavior.
+                from io import BytesIO
+                from pypdf import PdfReader
+                if not 1 <= len(PdfReader(BytesIO(rendered)).pages) <= 5:
+                    raise SummaryPageLimitError("Summary PDF exceeds five pages")
+        except SummaryPageLimitError:
+            return message + "\nPDF not generated: summary exceeds five pages. The HTML is available; use the full report for additional detail."
         except Exception as exc:
             return message + f"\nPDF not generated ({type(exc).__name__}). Install the browser with python -m playwright install chromium, or install requirements-chatcheck-pdf.txt and WeasyPrint native dependencies as a fallback. The HTML report is available."
         with pdf_path.open("xb") as stream:

@@ -214,3 +214,11 @@ python -m pytest -q -p no:cacheprovider
   test verifies a multipage PDF and footer numbers; mocked tests also verify safe
   HTML input, offline context settings and denied resource loading.
 - Weak/hardened samples retain all 76 appendix rows and their original outcomes.
+
+## Client summary mode
+
+Add `--summary` to `chatcheck report`, optionally with `--compare` and `--pdf`,
+for a client report capped at five PDF pages. It includes scores, top issues and
+scope/limits without the full appendix or trace dump. Full reports remain the
+default. Summary PDF verification requires `pypdf` from the PDF extra.
+See [Phase 5B](chatcheck-phase5b.md) for agent before/after interpretation and commands.

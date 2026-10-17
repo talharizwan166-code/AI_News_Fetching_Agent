@@ -512,3 +512,12 @@ JSON export, and the real browser widget. CI installs Chromium and enables widge
 tests. Mock controls include `echo:text`, `delay:seconds:text`, `flaky:text` (503
 on the first request per exact prompt), `error` (500), `bad-request` (400), and
 `invalid-json`. Restarting the mock resets its request counters.
+
+## Agent pipeline sandbox
+
+See [Phase 5: AI News Agent sandbox](chatcheck-agent-sandbox.md) for local RSS,
+GitHub, LinkedIn and email fakes, isolated pipeline runs, trace checks, optional
+capped model evaluation, and HTML/PDF behavior reports.
+
+[Phase 5B](chatcheck-phase5b.md) adds production draft validation, a shared two-call
+budget, frozen before/after evidence, and opt-in `chatcheck report --summary`.

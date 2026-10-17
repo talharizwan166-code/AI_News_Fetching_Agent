@@ -98,6 +98,7 @@ def parser():
     report.add_argument("--run", required=True)
     report.add_argument("--out", required=True, help="New .html output file")
     report.add_argument("--pdf", action="store_true", help="Also create a sibling PDF using Chromium, with optional WeasyPrint fallback")
+    report.add_argument("--summary", action="store_true", help="Client summary, at most five PDF pages; omit full appendix and trace dump")
     report.add_argument("--compare", help="Baseline run ID in the same database")
     report.add_argument("--client", default="Client not specified")
     report.add_argument("--suite-name", help="Explicit display name; does not change saved tests")
@@ -186,7 +187,7 @@ def main(argv=None):
                 from .report import Redactor, write_report
                 run = storage.results(args.run)
                 comparison = storage.results(args.compare) if args.compare else None
-                print(write_report(run, args.out, pdf=args.pdf, client=args.client, compare=comparison,
+                print(write_report(run, args.out, pdf=args.pdf, summary=args.summary, client=args.client, compare=comparison,
                                    suite_name=args.suite_name, suite_version=args.suite_version, not_tested=args.not_tested,
                                    redactor=Redactor.from_environment(args.redact_pattern), response_limit=args.response_limit))
                 return 0

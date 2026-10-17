@@ -113,6 +113,28 @@
   </section>
   {% endif %}
 
+  {% if agent_behavior %}
+  <section id="agent-behavior">
+    <h2>Agent behavior</h2>
+    <p>{{ sandbox.description if sandbox else 'Saved external actions in execution order.' }}</p>
+    <p>Emails contain the draft and are sent before approval by the existing pipeline. Publishing is handled by the separate approval workflow. Fake LLM results test containment and validation; they do not measure Gemini injection resistance.</p>
+    <p>Trace evidence below distinguishes raw drafts from downstream delivery. Raw draft checks run before target validation; rejecting a draft does not remove it from the trace. A strict one-call check still fails when a configured two-call budget is respected. Verdicts remain unchanged.</p>
+    {% for finding in agent_evidence %}
+    <h3>{{ finding.test_key }}</h3>
+    <p>Current: {{ finding.current.calls }} LLM calls; {{ finding.current.deliveries }} successful downstream deliveries (issues, emails and posts).
+    {% if finding.before %}Baseline: {{ finding.before.calls }} LLM calls; {{ finding.before.deliveries }} deliveries.{% endif %}</p>
+    <p>Frozen rule result: {{ finding.reason }}</p>
+    {% endfor %}
+    {% for item in agent_behavior %}
+    <h3>{{ item.test_key }}</h3>
+    {% for event in item.events %}
+    <p><strong>{{ event.seq }} · {{ event.action }} · {{ event.status }}</strong> · {{ event.timestamp }}</p>
+    <pre class="evidence" dir="auto">{{ event.arguments | tojson(indent=2) }}
+Result: {{ event.result | tojson(indent=2) }}</pre>
+    {% endfor %}
+    {% endfor %}
+  </section>
+  {% endif %}
   <section id="scope-and-limits">
     {% if target_llm %}<p>Real target: {{ target_llm.provider }} / {{ target_llm.model }}. Raw model responses were evaluated with confidential synthetic data seeded in the system prompt. The target model is separate from the verdict judge.</p>{% endif %}
     {% if not_run %}<p>{{ not_run }} tests were not run because the target stopped or its budget was exhausted. They receive no pass credit.</p>{% endif %}

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>{{ client }} · Chatcheck summary</title>
+  <style>
+    @page { size: A4; margin: 17mm 14mm 18mm; }
+    * { box-sizing: border-box; }
+    body { margin:0; color:#172b40; background:#edf2f5; font:14px/1.45 "Segoe UI", "Nirmala UI", Arial, sans-serif; }
+    main { max-width:800px; margin:24px auto; }
+    .page { padding:28px; background:white; margin-bottom:20px; overflow-wrap:anywhere; }
+    h1 { font-size:30px; margin:8px 0; } h2 { font-size:21px; margin:8px 0 16px; } h3 { font-size:16px; margin:10px 0; }
+    p { margin:8px 0; } .eyebrow { color:#0f766e; font-size:12px; font-weight:bold; }
+    .score { background:#112d42; color:white; padding:20px; margin:18px 0; } .score strong { font-size:40px; }
+    .note { font-size:12px; color:#52667a; } .issue { padding:12px 0; border-bottom:1px solid #ddd; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; margin:14px 0; }
+    th,td { text-align:left; vertical-align:top; border-bottom:1px solid #ddd; padding:8px; } th { background:#eff5f8; }
+    .limit { padding:12px; background:#eff5f8; }
+    @media print { body { background:white; font-size:10pt; } main { margin:0; max-width:none; }
+      .page { padding:0; margin:0; break-after:page; } .page:last-child { break-after:auto; }
+      h2,h3 { break-after:avoid; } .issue,tr { break-inside:avoid; } }
+  </style>
+</head>
+<body><main>
+<section class="page">
+  <p class="eyebrow">CHATCHECK / CLIENT SUMMARY</p>
+  <h1>{{ client }}</h1><p>{{ target }}</p>
+  <p class="note">Run {{ run_id }} · {{ run_date }} · {{ status }}</p>
+  <div class="score"><strong>{{ headline.display }}</strong><br>{{ headline.passed }} / {{ headline.total }} evaluated responses passed</div>
+  <h2>What the run shows</h2>
+  {% for line in summary %}<p>{{ line }}</p>{% endfor %}
+  {% if comparison %}
+  <h2>Before / after</h2>
+  <table><thead><tr><th>Baseline</th><th>Current</th><th>Matched definitions</th></tr></thead><tbody><tr><td>{{ comparison.before.display }}</td><td>{{ comparison.after.display }}</td><td>{{ comparison.matched }}</td></tr></tbody></table>
+  <p>{{ comparison.fixed|length }} fixed verdicts; {{ comparison.newly_failing|length }} newly failing; {{ comparison.modified|length }} modified definitions; {{ comparison.added|length }} added; {{ comparison.removed|length }} removed.</p>
+  <p class="note">Baseline run: {{ comparison.run_id[:100] }}. {% if comparison.warnings %}Comparison has {{ comparison.warnings|length }} caveat(s); see the full report.{% endif %}</p>
+  {% endif %}
+  <p class="note">Condensed report. Full evidence, complete issue details and all test results remain available in the full report and saved run.</p>
+</section>
+{% for page in issue_pages %}
+<section class="page">
+  <h2>Top issues{% if loop.index > 1 %} (continued){% endif %}</h2>
+  {% for issue in page %}
+  <article class="issue">
+    <p class="eyebrow">{{ issue.severity }} · {{ issue.frequency }} test(s)</p>
+    <h3>{{ issue.category|replace('_',' ') }} / {{ issue.check_type }}</h3>
+    <p><strong>Example:</strong> {{ issue.test_key }}</p><p>{{ issue.reason }}</p>
+    <p><strong>Why it matters:</strong> {{ issue.why }}</p>
+    <p><strong>Suggested next step:</strong> {{ issue.fix }}</p>
+  </article>
+  {% else %}<p>No failing issue groups were recorded. Pending and uncertain results still require review.</p>{% endfor %}
+</section>
+{% endfor %}
+<section class="page">
+  <h2>Scope and limits</h2>
+  <p>{{ overall.total }} planned tests; {{ coverage.received }} usable responses; {{ connector_errors }} connector errors. {{ review_count }} results flagged for review.</p>
+  <p>{{ llm_judged }} saved model/fake judge evaluations; {{ agreement.labeled }} human labels. Automated scores are not independent safety certification.</p>
+  {% if sandbox %}
+  <h3>Agent behavior</h3>
+  <p>Local recording sinks; {{ sandbox.mode }} LLM mode. Raw drafts are traced before target validation. Delivery counts cover successful issues, emails and posts.</p>
+  <table><thead><tr><th>Failed case</th><th>Calls before → now</th><th>Deliveries before → now</th></tr></thead><tbody>
+    {% for row in agent_evidence %}<tr><td>{{ row.test_key }}</td><td>{{ row.before.calls if row.before else '—' }} → {{ row.current.calls }}</td><td>{{ row.before.deliveries if row.before else '—' }} → {{ row.current.deliveries }}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="note">Rejecting an unsafe raw draft can still fail frozen checks that prohibit the raw draft or require issue creation. A two-call cap still fails a one-call rule. These distinctions do not alter the score. Fake outputs do not establish live-model injection resistance.</p>
+  {% endif %}
+  <h3>Not tested</h3>
+  <ul>{% for item in not_tested %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% if scope_omitted %}<p class="note">{{ scope_omitted }} additional scope exclusions appear in the full report.</p>{% endif %}
+  <p class="limit">These results cover the saved scenarios only. They do not prove the agent is completely safe.</p>
+  <p class="note">No full appendix or raw trace dump in summary mode. Text may be condensed; redaction happens before shortening.</p>
+</section>
+</main></body></html>

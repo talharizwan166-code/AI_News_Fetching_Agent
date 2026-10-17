@@ -36,6 +36,9 @@ MIGRATIONS = (
         "CREATE INDEX judge_cache_runs_key ON judge_cache_runs(cache_key)",
         "INSERT OR IGNORE INTO judge_cache_runs SELECT t.run_id, c.cache_key FROM llm_verdicts l JOIN tests t ON t.id=l.test_id JOIN llm_cache c ON c.cache_key=json_extract(l.result_json, '$.cache_key')",
     ),
+    (
+        "CREATE TABLE agent_events (test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE, seq INTEGER NOT NULL, timestamp TEXT NOT NULL, action TEXT NOT NULL, arguments_json TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(test_id, seq))",
+    ),
 )
 
 
@@ -104,6 +107,21 @@ class Storage:
                 "INSERT INTO verdicts (test_id, passed, reason, checks_json) VALUES (?, ?, ?, ?)",
                 (test_id, int(verdict.passed), verdict.reason, json.dumps(verdict.checks)),
             )
+
+    def record_event(self, test_id, event):
+        with self.connection:
+            self.connection.execute(
+                "INSERT INTO agent_events VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (test_id, event["seq"], event["timestamp"], event["action"],
+                 json.dumps(event["arguments"], ensure_ascii=False), event["status"],
+                 json.dumps(event.get("result", {}), ensure_ascii=False)),
+            )
+
+    def agent_events(self, test_id):
+        return [{"seq": row["seq"], "timestamp": row["timestamp"], "action": row["action"],
+                 "arguments": json.loads(row["arguments_json"]), "status": row["status"],
+                 "result": json.loads(row["result_json"])} for row in self.connection.execute(
+                     "SELECT * FROM agent_events WHERE test_id=? ORDER BY seq", (test_id,))]
 
     def reserve_target_retry(self, test_id, session):
         """Claim one error-only retry atomically; journal lives with the run."""
@@ -198,6 +216,7 @@ class Storage:
         for row in self.connection.execute("SELECT * FROM tests WHERE run_id=? ORDER BY position", (run_id,)):
             test = dict(row)
             test["checks"] = json.loads(test.pop("checks_json"))
+            test["agent_behavior"] = self.agent_events(test["id"])
             test["tags"] = json.loads(test.pop("tags_json"))
             test["responses"] = [dict(r) for r in self.connection.execute("SELECT * FROM responses WHERE test_id=? ORDER BY attempt", (test["id"],))]
             verdict = self.connection.execute("SELECT * FROM verdicts WHERE test_id=?", (test["id"],)).fetchone()
@@ -291,7 +310,7 @@ class Storage:
         if older_than is not None and (type(older_than) not in (int, float) or not math.isfinite(older_than) or older_than < 0):
             raise ValueError("older-than must be a finite nonnegative number of days")
         tables = ("runs", "tests", "responses", "verdicts", "llm_verdicts", "human_labels",
-                  "judge_calls", "judge_cache_runs", "llm_cache", "label_sample_items", "label_samples")
+                  "judge_calls", "judge_cache_runs", "llm_cache", "label_sample_items", "label_samples", "agent_events")
         self.connection.execute("PRAGMA secure_delete = ON")
         with self.connection:
             self.connection.execute("BEGIN IMMEDIATE")
@@ -345,6 +364,9 @@ class Storage:
             else:
                 updated = 0
             counts = {table: before[table] - self.connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
+            # Preserve the existing purge summary for non-agent databases.
+            if counts.get("agent_events") == 0:
+                counts.pop("agent_events")
         return {"deleted": counts, "samples_updated": updated}
 
     def save_sample(self, test_ids, metadata):
@@ -395,6 +417,10 @@ class Storage:
                      test.get("expected_behavior"), test.get("severity"), json.dumps(test.get("tags", []))),
                 )
                 test_id = cursor.lastrowid
+                for event in test.get("agent_behavior", []):
+                    self.connection.execute("INSERT INTO agent_events VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                            (test_id, event["seq"], event["timestamp"], event["action"], json.dumps(event["arguments"]),
+                                             event["status"], json.dumps(event.get("result", {}))))
                 for response in test["responses"]:
                     self.connection.execute("INSERT INTO responses (test_id, attempt, text, latency_ms, error, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                                             (test_id, response["attempt"], response["text"], response["latency_ms"], response["error"], response["created_at"]))

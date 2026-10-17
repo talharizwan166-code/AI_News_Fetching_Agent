@@ -2,3 +2,4 @@
 # Windows also needs native Pango libraries for WeasyPrint; see docs.
 -r requirements-chatcheck.txt
 WeasyPrint>=68,<71
+pypdf>=5,<7

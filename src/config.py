@@ -47,6 +47,9 @@ GEMINI_MODEL = env_str("GEMINI_MODEL", "gemini-3.5-flash")
 GEMINI_FALLBACK_MODEL = env_str("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
 
 GEMINI_MAX_RETRIES = env_int("GEMINI_MAX_RETRIES", 3)
+GEMINI_MAX_CALLS_PER_ARTICLE = env_int("GEMINI_MAX_CALLS_PER_ARTICLE", 2)
+DRAFT_ALLOWED_URLS = tuple(filter(None, (item.strip() for item in env_str("DRAFT_ALLOWED_URLS", "").split(","))))
+DRAFT_ALLOWED_EMAILS = tuple(filter(None, (item.strip() for item in env_str("DRAFT_ALLOWED_EMAILS", "").split(","))))
 GEMINI_RETRY_WAIT_MIN = env_int("GEMINI_RETRY_WAIT_MIN", 2)
 GEMINI_RETRY_WAIT_MAX = env_int("GEMINI_RETRY_WAIT_MAX", 30)
 
@@ -110,6 +113,8 @@ class Config:
             errors.append("EMAIL_SMTP_PORT must be between 1 and 65535")
         if GEMINI_MAX_RETRIES < 1:
             errors.append("GEMINI_MAX_RETRIES must be at least 1")
+        if GEMINI_MAX_CALLS_PER_ARTICLE < 1:
+            errors.append("GEMINI_MAX_CALLS_PER_ARTICLE must be at least 1")
         if GEMINI_RETRY_WAIT_MIN < 0 or GEMINI_RETRY_WAIT_MAX < GEMINI_RETRY_WAIT_MIN:
             errors.append("GEMINI_RETRY_WAIT_MIN and GEMINI_RETRY_WAIT_MAX must satisfy 0 <= min <= max")
         return not errors, "; ".join(errors)

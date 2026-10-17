@@ -81,6 +81,7 @@ def test_retries_on_server_error_then_succeeds(mock_genai):
 @patch("src.generator.GEMINI_RETRY_WAIT_MIN", 0)
 @patch("src.generator.GEMINI_RETRY_WAIT_MAX", 0)
 @patch("src.generator.GEMINI_API_KEY", "fake-key")
+@patch("src.generator.GEMINI_MAX_CALLS_PER_ARTICLE", 4)
 @patch("src.generator.genai")
 def test_falls_back_to_secondary_model(mock_genai):
     mock_client = MagicMock()
@@ -113,5 +114,6 @@ def test_raises_when_both_models_fail(mock_genai):
     mock_client.models.generate_content.side_effect = _server_error()
     mock_genai.Client.return_value = mock_client
 
-    with pytest.raises(ServerError):
+    with pytest.raises(ValueError, match="Per-article LLM call budget exhausted"):
         generate_linkedin_post(_article())
+    assert mock_client.models.generate_content.call_count == 2
