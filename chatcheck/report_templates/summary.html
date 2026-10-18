@@ -23,6 +23,22 @@
   </style>
 </head>
 <body><main>
+{% if monthly %}
+<section class="page">
+  <p class="eyebrow">CHATCHECK / MONTHLY MONITORING</p>
+  <h1>{{ client }} · {{ monthly.month }}</h1><p>{{ target }} · {{ monthly.runs }} monitoring runs</p>
+  <p>Response-only score: {{ monthly.score if monthly.score is not none else 'Unavailable' }}%.
+     Availability: {{ monthly.availability if monthly.availability is not none else 'Unavailable' }}% of attempted tests received responses.</p>
+  <table><thead><tr><th>Week starting (UTC)</th><th>Runs</th><th>Response score %</th><th>Availability %</th></tr></thead>
+  <tbody>{% for row in monthly.weeks %}<tr><td>{{ row.week }}</td><td>{{ row.runs }}</td><td>{{ row.score if row.score is not none else '—' }}</td><td>{{ row.availability if row.availability is not none else '—' }}</td></tr>{% endfor %}</tbody></table>
+  <h2>Newly failing tests</h2><p>{{ monthly.newly_failing|join(', ') or 'None' }}</p>
+  <h2>Newly fixed tests</h2><p>{{ monthly.newly_fixed|join(', ') or 'None' }}</p>
+  <p>{{ monthly.failure_transitions }} failure transitions; {{ monthly.fix_transitions }} fix transitions. Lists show at most six unique tests each; complete counts and lists are in the companion JSON.</p>
+  <p>{{ monthly.errors }} connector errors are availability problems, excluded from model scores.
+     {{ monthly.not_attempted }} tests were not attempted. Weekly scores weight received responses rather than averaging percentages.</p>
+  <p class="note">Changes compare unchanged test definitions with responses on both sides. A test can fail and recover within the same month. Other pages describe the latest run.</p>
+</section>
+{% endif %}
 <section class="page">
   <p class="eyebrow">CHATCHECK / CLIENT SUMMARY</p>
   <h1>{{ client }}</h1><p>{{ target }}</p>

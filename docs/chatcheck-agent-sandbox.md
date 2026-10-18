@@ -1,5 +1,9 @@
 # Phase 5: AI News Agent sandbox
 
+The original suite is frozen. [Phase 5C](chatcheck-phase5c.md) adds a separate v2
+delivery-boundary check-set and actual source-revision retests. It was written
+after observing the original results and is not an independent benchmark.
+
 This source-checkout harness runs the actual `src.agent.run_agent()` pipeline and the
 scripts in `.github/workflows/linkedin_approve.yml`. It does not change production
 source or workflow behavior. The sandbox adapter supplies configuration in a

@@ -113,11 +113,21 @@ def parser():
     selection.add_argument("--run")
     selection.add_argument("--older-than", type=float, help="Delete finished runs started more than DAYS ago")
     purge.add_argument("--yes", action="store_true", help="Confirm deletion of the selected run data")
+    monitor = commands.add_parser("monitor", help="Run one scheduled, idempotent monitoring cycle")
+    monitor.add_argument("--config", required=True)
+    monitor.add_argument("--dry-run", action="store_true", help="Run tests but print alerts instead of sending")
+    monitor.add_argument("--monthly", action="store_true", help="Report saved runs only; no tests or alerts")
+    monitor.add_argument("--month", help="YYYY-MM for monthly reporting; default previous UTC month")
+    retention = commands.add_parser("retention", help="Inventory old client data; deletion requires --yes")
+    retention.add_argument("--policy", required=True)
+    retention.add_argument("--yes", action="store_true")
+    retention.add_argument("--out", help="New .html or JSON inventory/deletion receipt")
+    commands.add_parser("dashboard", help="Launch optional read-only Streamlit dashboard on loopback")
     for command in (label, agreement):
         selection = command.add_mutually_exclusive_group(required=True)
         selection.add_argument("--run")
         selection.add_argument("--sample")
-    for command in (run, results, export, imports, sample, label, agreement, report, purge):
+    for command in (run, results, export, imports, sample, label, agreement, report, purge, monitor, retention):
         command.add_argument("--db", default="chatcheck.db", help="SQLite path (default: chatcheck.db)")
     return root
 
@@ -129,6 +139,32 @@ def main(argv=None):
             stream.reconfigure(errors="backslashreplace")
     args = parser().parse_args(argv)
     try:
+        if args.command in {"monitor", "retention", "dashboard"}:
+            from .monitor_store import secret_redactor
+            if args.command == "dashboard":
+                from .dashboard import launch
+                return launch()
+            if args.command == "monitor":
+                from .monitor import load_config, cycle
+                config = load_config(args.config)
+                if args.month and not args.monthly:
+                    raise ValueError("--month requires --monthly")
+                if args.monthly:
+                    from .monitor_monthly import monthly
+                    if not Path(args.db).is_file():
+                        raise ValueError("Monitoring database not found")
+                    result = monthly(config, args.db, month=args.month)
+                else:
+                    result = asyncio.run(cycle(config, args.db, dry_run=args.dry_run))
+            else:
+                from .retention import load_policy, retain, write_inventory
+                if args.out and Path(args.out).exists():
+                    raise ValueError("Retention output already exists")
+                result = retain(load_policy(args.policy), args.db, yes=args.yes)
+                if args.out:
+                    write_inventory(result, args.out)
+            print(json.dumps(secret_redactor().tree(result), indent=2, ensure_ascii=True))
+            return 2 if result.get("report_error") or any(v == "failed" for v in result.get("alerts", {}).values()) else 0
         if args.command == "freeze":
             from .tuning import freeze_suite, guard_path
             guard = freeze_suite(args.suite, role=args.role, unfreeze=args.unfreeze)
@@ -185,11 +221,15 @@ def main(argv=None):
                 return 0
             if args.command == "report":
                 from .report import Redactor, write_report
+                from .monitor_store import register_artifact
                 run = storage.results(args.run)
                 comparison = storage.results(args.compare) if args.compare else None
                 print(write_report(run, args.out, pdf=args.pdf, summary=args.summary, client=args.client, compare=comparison,
                                    suite_name=args.suite_name, suite_version=args.suite_version, not_tested=args.not_tested,
                                    redactor=Redactor.from_environment(args.redact_pattern), response_limit=args.response_limit))
+                for path in ([Path(args.out), Path(args.out).with_suffix(".pdf")] if args.pdf else [Path(args.out)]):
+                    if path.is_file():
+                        register_artifact(storage, path, run_id=args.run, kind="report")
                 return 0
             if args.command == "import":
                 print("Imported run: " + storage.import_run(read_json(args.input)))
@@ -218,6 +258,9 @@ def main(argv=None):
                 # Avoid truncating a database or an existing export accidentally.
                 with Path(args.output).open("x", encoding="utf-8") as stream:
                     stream.write(payload + "\n")
+                from .monitor_store import register_artifact
+                with Storage(args.db) as storage:
+                    register_artifact(storage, args.output, run_id=args.run, kind="export")
             else:
                 print(payload)
         return 0
@@ -225,7 +268,15 @@ def main(argv=None):
         print("Run cancelled; partial results were retained.", file=sys.stderr)
         return 130
     except (ValueError, OSError, sqlite3.Error, TypeError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        if args.command in {"monitor", "retention", "dashboard"}:
+            from .monitor_store import secret_redactor
+            try:
+                diagnostic = secret_redactor().text(f"Error: {exc}")
+            except Exception:
+                diagnostic = "Monitoring configuration invalid; diagnostic values withheld"
+            print(diagnostic, file=sys.stderr)
+        else:
+            print(f"Error: {exc}", file=sys.stderr)
         return 2
     except Exception as exc:
         print(f"Engine error ({type(exc).__name__}). Check target setup; for widgets run: python -m playwright install chromium", file=sys.stderr)

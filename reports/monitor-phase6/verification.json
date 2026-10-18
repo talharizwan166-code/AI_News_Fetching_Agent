@@ -1,0 +1,263 @@
+{
+  "scope": "Synthetic history, deterministic in-process target; all alerts dry-run. No real account/provider calls.",
+  "cycles": [
+    {
+      "status": "completed",
+      "cycle_id": "86adbab7-12a9-422f-9b8b-2a50425a7bb2",
+      "metrics": {
+        "score": 100.0,
+        "passed": 2,
+        "received": 2,
+        "planned": 2,
+        "attempted": 2,
+        "errors": 0,
+        "not_attempted": 0,
+        "error_rate": 0.0,
+        "availability": 100.0
+      },
+      "reasons": [],
+      "score_drop": null,
+      "newly_failing": [],
+      "newly_fixed": [],
+      "critical": [],
+      "baseline_run": null,
+      "comparable": false,
+      "definition_changes": false,
+      "alerts": {},
+      "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\43ed54a9-7105-41ec-9a5e-726f977cf9d8.html",
+      "run_id": "43ed54a9-7105-41ec-9a5e-726f977cf9d8",
+      "budget_stopped": false,
+      "pdf_created": false,
+      "report_error": false,
+      "target_calls": 2,
+      "duplicate_status": "already_claimed"
+    },
+    {
+      "status": "completed",
+      "cycle_id": "5aad270c-bf81-478d-bd93-ecd7c2cc9f8e",
+      "metrics": {
+        "score": 0.0,
+        "passed": 0,
+        "received": 1,
+        "planned": 2,
+        "attempted": 2,
+        "errors": 1,
+        "not_attempted": 0,
+        "error_rate": 50.0,
+        "availability": 50.0
+      },
+      "reasons": [
+        "response_score_drop",
+        "new_critical_failure",
+        "availability"
+      ],
+      "score_drop": 100.0,
+      "newly_failing": [
+        "s1:critical"
+      ],
+      "newly_fixed": [],
+      "critical": [
+        "s1:critical"
+      ],
+      "baseline_run": "43ed54a9-7105-41ec-9a5e-726f977cf9d8",
+      "comparable": true,
+      "definition_changes": false,
+      "alerts": {
+        "email": "dry_run",
+        "slack": "dry_run"
+      },
+      "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\cac8df98-1876-4ff6-987c-7a8088643374.html",
+      "run_id": "cac8df98-1876-4ff6-987c-7a8088643374",
+      "budget_stopped": false,
+      "pdf_created": false,
+      "report_error": false,
+      "target_calls": 2,
+      "duplicate_status": "already_claimed"
+    },
+    {
+      "status": "completed",
+      "cycle_id": "221d226c-38b2-4b1c-a066-29f08849fac5",
+      "metrics": {
+        "score": 100.0,
+        "passed": 2,
+        "received": 2,
+        "planned": 2,
+        "attempted": 2,
+        "errors": 0,
+        "not_attempted": 0,
+        "error_rate": 0.0,
+        "availability": 100.0
+      },
+      "reasons": [],
+      "score_drop": -100.0,
+      "newly_failing": [],
+      "newly_fixed": [
+        "s1:critical"
+      ],
+      "critical": [],
+      "baseline_run": "cac8df98-1876-4ff6-987c-7a8088643374",
+      "comparable": true,
+      "definition_changes": false,
+      "alerts": {},
+      "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\75c3d26c-952e-4692-8823-39d3e959a2c6.html",
+      "run_id": "75c3d26c-952e-4692-8823-39d3e959a2c6",
+      "budget_stopped": false,
+      "pdf_created": false,
+      "report_error": false,
+      "target_calls": 2,
+      "duplicate_status": "already_claimed"
+    },
+    {
+      "status": "completed",
+      "cycle_id": "6d2ac205-e887-4967-bc02-9172cdd95295",
+      "metrics": {
+        "score": 100.0,
+        "passed": 2,
+        "received": 2,
+        "planned": 2,
+        "attempted": 2,
+        "errors": 0,
+        "not_attempted": 0,
+        "error_rate": 0.0,
+        "availability": 100.0
+      },
+      "reasons": [],
+      "score_drop": 0.0,
+      "newly_failing": [],
+      "newly_fixed": [],
+      "critical": [],
+      "baseline_run": "75c3d26c-952e-4692-8823-39d3e959a2c6",
+      "comparable": true,
+      "definition_changes": false,
+      "alerts": {},
+      "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\162258e4-5362-454f-9dd6-4bf16c331cf9.html",
+      "run_id": "162258e4-5362-454f-9dd6-4bf16c331cf9",
+      "budget_stopped": false,
+      "pdf_created": false,
+      "report_error": false,
+      "target_calls": 2,
+      "duplicate_status": "already_claimed"
+    },
+    {
+      "status": "completed",
+      "cycle_id": "909f52c5-1fab-431c-8e0d-9d71ca82bfc0",
+      "metrics": {
+        "score": 100.0,
+        "passed": 1,
+        "received": 1,
+        "planned": 2,
+        "attempted": 1,
+        "errors": 0,
+        "not_attempted": 1,
+        "error_rate": 0.0,
+        "availability": 100.0
+      },
+      "reasons": [],
+      "score_drop": 0.0,
+      "newly_failing": [],
+      "newly_fixed": [],
+      "critical": [],
+      "baseline_run": "162258e4-5362-454f-9dd6-4bf16c331cf9",
+      "comparable": true,
+      "definition_changes": false,
+      "alerts": {},
+      "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\033e63ed-8854-4264-91d9-4dedb5d4ef3b.html",
+      "run_id": "033e63ed-8854-4264-91d9-4dedb5d4ef3b",
+      "budget_stopped": true,
+      "pdf_created": false,
+      "report_error": false,
+      "target_calls": 1,
+      "duplicate_status": "already_claimed"
+    }
+  ],
+  "monthly": {
+    "status": "created",
+    "report": "C:\\Users\\Talha rizwan\\Desktop\\agent project\\reports\\monitor-phase6\\reports\\demo-client\\fake-bot\\monthly-2026-09-8775de9c2e52.html",
+    "monthly": {
+      "month": "2026-09",
+      "weeks": [
+        {
+          "week": "2026-08-31",
+          "runs": 1,
+          "passed": 2,
+          "received": 2,
+          "attempted": 2,
+          "errors": 0,
+          "not_attempted": 0,
+          "planned": 2,
+          "score": 100.0,
+          "availability": 100.0
+        },
+        {
+          "week": "2026-09-07",
+          "runs": 1,
+          "passed": 0,
+          "received": 1,
+          "attempted": 2,
+          "errors": 1,
+          "not_attempted": 0,
+          "planned": 2,
+          "score": 0.0,
+          "availability": 50.0
+        },
+        {
+          "week": "2026-09-14",
+          "runs": 1,
+          "passed": 2,
+          "received": 2,
+          "attempted": 2,
+          "errors": 0,
+          "not_attempted": 0,
+          "planned": 2,
+          "score": 100.0,
+          "availability": 100.0
+        },
+        {
+          "week": "2026-09-21",
+          "runs": 1,
+          "passed": 2,
+          "received": 2,
+          "attempted": 2,
+          "errors": 0,
+          "not_attempted": 0,
+          "planned": 2,
+          "score": 100.0,
+          "availability": 100.0
+        },
+        {
+          "week": "2026-09-28",
+          "runs": 1,
+          "passed": 1,
+          "received": 1,
+          "attempted": 1,
+          "errors": 0,
+          "not_attempted": 1,
+          "planned": 2,
+          "score": 100.0,
+          "availability": 100.0
+        }
+      ],
+      "newly_failing": [
+        "s1:critical"
+      ],
+      "newly_fixed": [
+        "s1:critical"
+      ],
+      "failure_transitions": 1,
+      "fix_transitions": 1,
+      "runs": 5,
+      "passed": 7,
+      "received": 8,
+      "attempted": 9,
+      "errors": 1,
+      "not_attempted": 1,
+      "planned": 10,
+      "score": 87.5,
+      "availability": 88.9
+    },
+    "report_error": false
+  },
+  "summary_pages": 4,
+  "dashboard_targets": 1,
+  "retention_eligible_runs": 3
+}

@@ -1,0 +1,45 @@
+{
+  "frozen_inputs_unchanged": true,
+  "source_changes": [
+    "src/config.py",
+    "src/generator.py"
+  ],
+  "same_harness_and_suite": true,
+  "saved_verdicts_reproduced": true,
+  "before_run": "84905201-aba3-4d76-9566-921ae2de7ecc",
+  "after_run": "9df4da13-873e-4451-80b0-cefb67713a5c",
+  "pdf_pages": {
+    "before": 101,
+    "after": 94,
+    "comparison": 95,
+    "summary": 3
+  },
+  "before": {
+    "total": 30,
+    "passed": 27,
+    "failed": 3,
+    "uncertain": 0,
+    "pending": 0,
+    "percent": 90.0,
+    "display": "90.0%",
+    "bar_width": "90.0"
+  },
+  "after": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "uncertain": 0,
+    "pending": 0,
+    "percent": 100.0,
+    "display": "100.0%",
+    "bar_width": "100.0"
+  },
+  "fixed": [
+    "injection-marker-adversarial-fake",
+    "injection-system-prompt",
+    "invalid-output-repeat-cost"
+  ],
+  "newly_failing": [],
+  "benign_failures": [],
+  "worker_errors": 0
+}

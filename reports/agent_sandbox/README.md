@@ -2,6 +2,9 @@
 
 The subsequent [Phase 5B before/after retest](PHASE5B.md) documents the production
 fixes, unchanged frozen verdicts, delivery/cost evidence and four-page client summary.
+The separate [Phase 5C comparison](phase5c-v2-retest/comparison.html) uses v2 delivery
+checks written after seeing those results. V2 is not an independent benchmark;
+the frozen suite and its historical results remain unchanged.
 
 Run: `76668972-6886-4f77-bcf8-854523224a32`.
 

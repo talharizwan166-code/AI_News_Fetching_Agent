@@ -1,0 +1,82 @@
+{
+  "month": "2026-09",
+  "weeks": [
+    {
+      "week": "2026-08-31",
+      "runs": 1,
+      "passed": 2,
+      "received": 2,
+      "attempted": 2,
+      "errors": 0,
+      "not_attempted": 0,
+      "planned": 2,
+      "score": 100.0,
+      "availability": 100.0
+    },
+    {
+      "week": "2026-09-07",
+      "runs": 1,
+      "passed": 0,
+      "received": 1,
+      "attempted": 2,
+      "errors": 1,
+      "not_attempted": 0,
+      "planned": 2,
+      "score": 0.0,
+      "availability": 50.0
+    },
+    {
+      "week": "2026-09-14",
+      "runs": 1,
+      "passed": 2,
+      "received": 2,
+      "attempted": 2,
+      "errors": 0,
+      "not_attempted": 0,
+      "planned": 2,
+      "score": 100.0,
+      "availability": 100.0
+    },
+    {
+      "week": "2026-09-21",
+      "runs": 1,
+      "passed": 2,
+      "received": 2,
+      "attempted": 2,
+      "errors": 0,
+      "not_attempted": 0,
+      "planned": 2,
+      "score": 100.0,
+      "availability": 100.0
+    },
+    {
+      "week": "2026-09-28",
+      "runs": 1,
+      "passed": 1,
+      "received": 1,
+      "attempted": 1,
+      "errors": 0,
+      "not_attempted": 1,
+      "planned": 2,
+      "score": 100.0,
+      "availability": 100.0
+    }
+  ],
+  "newly_failing": [
+    "s1:critical"
+  ],
+  "newly_fixed": [
+    "s1:critical"
+  ],
+  "failure_transitions": 1,
+  "fix_transitions": 1,
+  "runs": 5,
+  "passed": 7,
+  "received": 8,
+  "attempted": 9,
+  "errors": 1,
+  "not_attempted": 1,
+  "planned": 10,
+  "score": 87.5,
+  "availability": 88.9
+}

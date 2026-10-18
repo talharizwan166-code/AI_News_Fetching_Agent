@@ -55,7 +55,7 @@ def payload_strings(value, depth=0):
 
 
 def url_identity(value):
-    value = value.rstrip(".,;!?)\]،۔")
+    value = value.rstrip(".,;!?)]،۔")
     if value.startswith("//"):
         value = "https:" + value
     elif ":" not in value.split("/", 1)[0]:

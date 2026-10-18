@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>demo-client · Chatcheck summary</title>
+  <style>
+    @page { size: A4; margin: 17mm 14mm 18mm; }
+    * { box-sizing: border-box; }
+    body { margin:0; color:#172b40; background:#edf2f5; font:14px/1.45 "Segoe UI", "Nirmala UI", Arial, sans-serif; }
+    main { max-width:800px; margin:24px auto; }
+    .page { padding:28px; background:white; margin-bottom:20px; overflow-wrap:anywhere; }
+    h1 { font-size:30px; margin:8px 0; } h2 { font-size:21px; margin:8px 0 16px; } h3 { font-size:16px; margin:10px 0; }
+    p { margin:8px 0; } .eyebrow { color:#0f766e; font-size:12px; font-weight:bold; }
+    .score { background:#112d42; color:white; padding:20px; margin:18px 0; } .score strong { font-size:40px; }
+    .note { font-size:12px; color:#52667a; } .issue { padding:12px 0; border-bottom:1px solid #ddd; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; margin:14px 0; }
+    th,td { text-align:left; vertical-align:top; border-bottom:1px solid #ddd; padding:8px; } th { background:#eff5f8; }
+    .limit { padding:12px; background:#eff5f8; }
+    @media print { body { background:white; font-size:10pt; } main { margin:0; max-width:none; }
+      .page { padding:0; margin:0; break-after:page; } .page:last-child { break-after:auto; }
+      h2,h3 { break-after:avoid; } .issue,tr { break-inside:avoid; } }
+  </style>
+</head>
+<body><main>
+
+<section class="page">
+  <p class="eyebrow">CHATCHECK / MONTHLY MONITORING</p>
+  <h1>demo-client · 2026-09</h1><p>fake-bot · 5 monitoring runs</p>
+  <p>Response-only score: 87.5%.
+     Availability: 88.9% of attempted tests received responses.</p>
+  <table><thead><tr><th>Week starting (UTC)</th><th>Runs</th><th>Response score %</th><th>Availability %</th></tr></thead>
+  <tbody><tr><td>2026-08-31</td><td>1</td><td>100.0</td><td>100.0</td></tr><tr><td>2026-09-07</td><td>1</td><td>0.0</td><td>50.0</td></tr><tr><td>2026-09-14</td><td>1</td><td>100.0</td><td>100.0</td></tr><tr><td>2026-09-21</td><td>1</td><td>100.0</td><td>100.0</td></tr><tr><td>2026-09-28</td><td>1</td><td>100.0</td><td>100.0</td></tr></tbody></table>
+  <h2>Newly failing tests</h2><p>s1:critical</p>
+  <h2>Newly fixed tests</h2><p>s1:critical</p>
+  <p>1 failure transitions; 1 fix transitions. Lists show at most six unique tests each; complete counts and lists are in the companion JSON.</p>
+  <p>1 connector errors are availability problems, excluded from model scores.
+     1 tests were not attempted. Weekly scores weight received responses rather than averaging percentages.</p>
+  <p class="note">Changes compare unchanged test definitions with responses on both sides. A test can fail and recover within the same month. Other pages describe the latest run.</p>
+</section>
+
+<section class="page">
+  <p class="eyebrow">CHATCHECK / CLIENT SUMMARY</p>
+  <h1>demo-client</h1><p>fake-bot</p>
+  <p class="note">Run 033e63ed-8854-4264-91d9-4dedb5d4ef3b · 2026-09-29T00:00:00+00:00 · completed</p>
+  <div class="score"><strong>100.0%</strong><br>1 / 1 evaluated responses passed</div>
+  <h2>What the run shows</h2>
+  <p>The run passed 1 of 1 tests with model responses, giving a response-only score of 100.0%.</p><p>Of 2 planned tests, 0 ended with connector errors and 1 have no usable response; counting these as not-run gives 50.0% across all planned tests.</p><p>No failures were observed in the saved tests; untested behavior remains outside this result.</p><p>No definite rule and LLM disagreements were recorded.</p><p>No human labels exist for this run, so judge quality has not been measured against human decisions.</p>
+  
+  <p class="note">Condensed report. Full evidence, complete issue details and all test results remain available in the full report and saved run.</p>
+</section>
+
+<section class="page">
+  <h2>Top issues</h2>
+  <p>No failing issue groups were recorded. Pending and uncertain results still require review.</p>
+</section>
+
+<section class="page">
+  <h2>Scope and limits</h2>
+  <p>2 planned tests; 1 usable responses; 0 connector errors. 0 results flagged for review.</p>
+  <p>0 saved model/fake judge evaluations; 0 human labels. Automated scores are not independent safety certification.</p>
+  
+  <h3>Not tested</h3>
+  <ul><li>Production traffic and changes made after this saved run.</li><li>Multi-turn conversations, tool side effects and authorization of real customer accounts.</li><li>Load testing, exhaustive attacks and independent compliance certification.</li><li>Cover score describes the latest run; the monthly page aggregates received responses. Weeks start Monday (UTC).</li></ul>
+  
+  <p class="limit">These results cover the saved scenarios only. They do not prove the agent is completely safe.</p>
+  <p class="note">No full appendix or raw trace dump in summary mode. Text may be condensed; redaction happens before shortening.</p>
+</section>
+</main></body></html>

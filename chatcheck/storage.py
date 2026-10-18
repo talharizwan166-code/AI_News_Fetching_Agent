@@ -39,6 +39,11 @@ MIGRATIONS = (
     (
         "CREATE TABLE agent_events (test_id INTEGER NOT NULL REFERENCES tests(id) ON DELETE CASCADE, seq INTEGER NOT NULL, timestamp TEXT NOT NULL, action TEXT NOT NULL, arguments_json TEXT NOT NULL, status TEXT NOT NULL, result_json TEXT NOT NULL, PRIMARY KEY(test_id, seq))",
     ),
+    (
+        "CREATE TABLE monitor_cycles (id TEXT PRIMARY KEY, client_id TEXT NOT NULL, target_id TEXT NOT NULL, slot INTEGER NOT NULL, created_at TEXT NOT NULL, finished_at TEXT, status TEXT NOT NULL, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, config_hash TEXT NOT NULL, schedule TEXT NOT NULL, report_root TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0, reserved_cost REAL NOT NULL DEFAULT 0, summary_json TEXT, UNIQUE(client_id, target_id, slot))",
+        "CREATE TABLE monitor_alerts (cycle_id TEXT NOT NULL REFERENCES monitor_cycles(id) ON DELETE CASCADE, channel TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY(cycle_id, channel))",
+        "CREATE TABLE monitor_artifacts (path TEXT PRIMARY KEY, client_id TEXT NOT NULL, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, kind TEXT NOT NULL, created_at TEXT NOT NULL, sha256 TEXT NOT NULL)",
+    ),
 )
 
 

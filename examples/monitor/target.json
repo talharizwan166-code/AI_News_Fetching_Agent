@@ -1,0 +1,8 @@
+{
+  "name": "Client test chatbot",
+  "type": "http",
+  "url": "http://127.0.0.1:8765/chat",
+  "request_template": {"message": "{{prompt}}"},
+  "response_json_path": "$.reply",
+  "runner": {"concurrency": 1, "timeout": 20, "retries": 0}
+}

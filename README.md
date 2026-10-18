@@ -17,6 +17,12 @@ and response-only scores; the [tuning protocol](tuning-protocol.md) protects the
 held-out suite and requires human review plus a changelog for MAIN revisions.
 The [mutation audit](reports/meher_threads/mutation/README.md) records original
 coverage gaps, added tests, dead tests, and an untuned 20-test held-out evaluation.
+The [Phase 5C guide](docs/chatcheck-phase5c.md) documents the separate retrospective
+v2 delivery checks and the pre-fix/fixed sandbox comparison. The frozen Phase 5
+suite remains unchanged; v2 is not an independent benchmark.
+The [Phase 6 monitoring guide](docs/chatcheck-monitoring.md) covers scheduled cycles,
+regression and availability alerts, monthly summaries, a read-only dashboard and
+client retention inventories/deletion receipts.
 
 A Python agent that collects AI news from RSS feeds, filters and ranks articles,
 asks Gemini to draft a LinkedIn post, and delivers the draft through email and a

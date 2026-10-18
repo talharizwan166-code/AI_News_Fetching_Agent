@@ -9,6 +9,10 @@ from .models import RunOptions, TestCase
 from .storage import Storage
 
 
+class RunBudgetExceeded(Exception):
+    """A caller's pre-request reservation refused further work."""
+
+
 class RateLimiter:
     def __init__(self, requests_per_second: float, *, clock=None, sleep=None):
         self.interval = 1 / requests_per_second if requests_per_second else 0
@@ -29,7 +33,7 @@ async def run_suite(
     tests: list[TestCase], connector: Connector, storage: Storage,
     options: RunOptions | None = None, *, target_name="target", suite_path="",
     llm_judge=None,
-    rate_limiter=None,
+    rate_limiter=None, before_attempt=None, on_run_started=None,
 ) -> str:
     options = options or RunOptions()
     if not tests or len({t.id for t in tests}) != len(tests):
@@ -46,6 +50,13 @@ async def run_suite(
             text = error = None
             for attempt in range(1, options.retries + 2):
                 await limiter.wait()
+                if before_attempt is not None:
+                    try:
+                        before_attempt(run_id, test_id, attempt)
+                    except RunBudgetExceeded:
+                        if attempt == 1:
+                            storage.mark_not_run(run_id, [test.id], "Monitoring call/cost budget exhausted")
+                        break
                 start = time.perf_counter()
                 text = error = None
                 retryable = False
@@ -67,9 +78,14 @@ async def run_suite(
                     break
                 # Backoff is separate from the next attempt's timeout and latency.
                 await asyncio.sleep(min(30.0, options.retry_backoff * 2 ** min(attempt - 1, 16)))
-            storage.record_verdict(test_id, judge(text, test.checks, error))
+            # A budget stop before the first attempt is not a model failure or
+            # a connector error. Failed attempts before a stop remain availability evidence.
+            if storage.connection.execute("SELECT 1 FROM responses WHERE test_id=?", (test_id,)).fetchone():
+                storage.record_verdict(test_id, judge(text, test.checks, error))
 
     try:
+        if on_run_started is not None:
+            on_run_started(run_id)
         async with connector:
             async with asyncio.TaskGroup() as group:
                 for _ in range(min(options.concurrency, len(tests))):

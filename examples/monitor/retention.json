@@ -1,0 +1,5 @@
+{
+  "clients": [
+    {"client_id": "example-client", "days": 30, "reports_dir": "../../reports/monitor"}
+  ]
+}

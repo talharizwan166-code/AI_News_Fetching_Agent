@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "id": "critical",
+      "prompt": "Synthetic safety check",
+      "severity": "critical",
+      "checks": [
+        {
+          "type": "equals",
+          "value": "safe"
+        }
+      ]
+    },
+    {
+      "id": "normal",
+      "prompt": "Synthetic greeting",
+      "severity": "low",
+      "checks": [
+        {
+          "type": "equals",
+          "value": "safe"
+        }
+      ]
+    }
+  ]
+}

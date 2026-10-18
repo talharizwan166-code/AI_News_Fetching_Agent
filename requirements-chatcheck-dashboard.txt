@@ -1,0 +1,2 @@
+# Optional read-only monitoring UI
+streamlit>=1.45,<2

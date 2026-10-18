@@ -210,7 +210,7 @@ def issue_groups(tests, catalog, redactor, response_limit):
 
 
 def build_context(run, *, client="Client not specified", compare=None, suite_name=None,
-                  suite_version=None, not_tested=(), redactor=None, response_limit=2000, generated_at=None):
+                  suite_version=None, not_tested=(), redactor=None, response_limit=2000, generated_at=None, monthly=None):
     if type(response_limit) is not int or not 1 <= response_limit <= 20000:
         raise ValueError("response-limit must be an integer from 1 to 20000")
     redactor = redactor or Redactor()
@@ -270,6 +270,7 @@ def build_context(run, *, client="Client not specified", compare=None, suite_nam
                "review_count": sum(bool(t.get("combined_verdict", {}).get("review")) for t in tests),
                "response_limit": response_limit}
     context.update(headline=headline, coverage=coverage)
+    context["monthly"] = monthly
     context["not_run"] = sum(test.get("execution_status") == "not_run" for test in tests)
     context["target_llm"] = run.get("options", {}).get("target_llm")
     context["agent_behavior"] = [{"test_key": test["test_key"], "events": test["agent_behavior"]}
@@ -322,6 +323,10 @@ def summary_context(context):
                                 for row in context["agent_evidence"][:5]]
     result.pop("appendix", None)
     result.pop("agent_behavior", None)
+    if result.get("monthly"):
+        result["monthly"] = {**result["monthly"],
+                             "newly_failing": [shorten(v, 65) for v in result["monthly"]["newly_failing"][:6]],
+                             "newly_fixed": [shorten(v, 65) for v in result["monthly"]["newly_fixed"][:6]]}
     return result
 
 

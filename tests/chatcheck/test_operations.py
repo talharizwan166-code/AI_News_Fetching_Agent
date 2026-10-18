@@ -152,8 +152,11 @@ def test_cache_ownership_migration_backfills_legacy_verdicts(tmp_path):
     with Storage(path) as db:
         run_id, _ = populated(db)
         # Restore schema v3 while retaining saved cache/verdict data. Drop all
-        # later additions so the fixture remains valid after the trace migration.
+        # later additions so the fixture remains valid after trace/monitor migrations.
         with db.connection:
+            db.connection.execute("DROP TABLE monitor_alerts")
+            db.connection.execute("DROP TABLE monitor_artifacts")
+            db.connection.execute("DROP TABLE monitor_cycles")
             db.connection.execute("DROP TABLE agent_events")
             db.connection.execute("DROP TABLE judge_cache_runs")
             db.connection.execute("DELETE FROM chatcheck_migrations WHERE version>=4")

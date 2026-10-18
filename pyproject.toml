@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["WeasyPrint>=68,<71", "pypdf>=5,<7"]
+dashboard = ["streamlit>=1.45,<2"]
 dev = ["pytest>=8", "build>=1.2", "setuptools>=77", "wheel>=0.45", "pypdf>=5,<7"]
 
 [project.scripts]

@@ -1,0 +1,16 @@
+{
+  "client_id": "example-client",
+  "target_id": "test-bot",
+  "target": "target.json",
+  "suites": ["suite.json"],
+  "schedule": {"description": "Daily at 00:15 UTC", "interval_minutes": 1440},
+  "score_drop_threshold": 5,
+  "error_rate_threshold": 10,
+  "recipients": ["owner@example.invalid"],
+  "channels": ["email"],
+  "call_budget": 30,
+  "max_cost": 0.30,
+  "cost_per_call": 0.01,
+  "reports_dir": "../../reports/monitor",
+  "pdf": false
+}

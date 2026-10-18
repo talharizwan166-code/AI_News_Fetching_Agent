@@ -1,0 +1,9 @@
+{
+  "clients": [
+    {
+      "client_id": "demo-client",
+      "days": 30,
+      "reports_dir": "reports"
+    }
+  ]
+}

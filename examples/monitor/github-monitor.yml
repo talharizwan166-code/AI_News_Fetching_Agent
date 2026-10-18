@@ -1,0 +1,30 @@
+# TEMPLATE ONLY. Copy into .github/workflows after configuring an authorized target.
+# Uses a self-hosted Windows runner with durable state outside its checkout.
+name: Client monitoring
+on:
+  schedule:
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: chatcheck-client-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    runs-on: [self-hosted, Windows, chatcheck]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install chatcheck
+        shell: pwsh
+        run: '& C:\Chatcheck\venv\Scripts\python.exe -m pip install .'
+      - name: Run one monitoring cycle
+        shell: pwsh
+        env:
+          CHATCHECK_SMTP_HOST: ${{ vars.CHATCHECK_SMTP_HOST }}
+          CHATCHECK_SMTP_FROM: ${{ vars.CHATCHECK_SMTP_FROM }}
+          CHATCHECK_SMTP_USER: ${{ secrets.CHATCHECK_SMTP_USER }}
+          CHATCHECK_SMTP_PASSWORD: ${{ secrets.CHATCHECK_SMTP_PASSWORD }}
+          CHATCHECK_SLACK_WEBHOOK: ${{ secrets.CHATCHECK_SLACK_WEBHOOK }}
+          TARGET_API_TOKEN: ${{ secrets.TARGET_API_TOKEN }}
+        run: '& C:\Chatcheck\venv\Scripts\python.exe -m chatcheck monitor --config C:\Chatcheck\clients\client.json --db C:\Chatcheck\data\monitor.sqlite3'
